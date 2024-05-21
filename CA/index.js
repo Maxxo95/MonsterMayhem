@@ -1,13 +1,19 @@
 const express = require("express");
 const bodyParser = require("body-parser");
+const ejs = require("ejs");
 const PORT = 3000;
 app = express()
 app.use(bodyParser.urlencoded({ extended: true}));
+app.set("view engine", "ejs");
 
+let viewCount = 0;
+
+////////////////////////////////////////
 app.get ("/", (req,res) => {
 console.log("New visitor");
 console.log(req);
-res.sendFile("index.html", {root: __dirname} )
+viewCount += 1;
+res.render("index.ejs" , {viewCount});
 });
 
 app.get ("/hello", (req,res) => {
