@@ -14,22 +14,12 @@ const httpServer = http.createServer(app);
 app.use(bodyParser.urlencoded({ extended: true }));
 app.set('view engine', 'ejs');
 app.use(express.static(path.join(__dirname, '.')));// location of app.js root 
-
+/////////////////// Mongo 
 const { MongoClient } = require('mongodb');
-
 const uri = 'mongodb://localhost:27017';
 
-// Variables
+/// Variables
 let viewCount = 0;
-let TestPosts = [
-    { title: 'Title', text: 'BlaBlablablabla' },
-    { title: 'two', text: 'BlaBlablablabla' }
-];
-let Users = [
-    { username: 'Max', pass: 'pass1234' },
-    { username: 'Sam', pass: 'pass1234' }
-];
-
 ////////////////////////////////////////////////// Routes
 app.get('/', (req, res) => {
     console.log('Welcome Visitor');
@@ -37,23 +27,26 @@ app.get('/', (req, res) => {
     res.render('index', { viewCount });
 });
 
-const server = http.createServer(app);
-const wsServer = new WebSocketServer({ noServer: true });
+//////////////////////  Sockets 
+const server = http.createServer(app); // creating http server for wesocket with the builded app 
+const wsServer = new WebSocketServer({ noServer: true }); // websocketServer
 //const wsServer = new WebSocketServer({ server });
 
+////////////////////Connection
 httpServer.listen(PORT, () => {
     console.log(`Listening on port ${PORT}`);
 });
 
-// WebSocket server
+// WebSocket server 
 httpServer.on('upgrade', (request, socket, head) => {
     wsServer.handleUpgrade(request, socket, head, (ws) => {
         wsServer.emit('connection', ws, request);
     });
 });
-wsServer.on('connection', async (ws) => {
-    ws.on('message', async (message) => {
-        let msgObj;
+//////////////////Login authentication
+wsServer.on('connection', async (ws) => { // connecting from the websocket 
+    ws.on('message', async (message) => { // assesing the message info passed by the front end app.js
+        let msgObj;    //// try catch for the JSON.parse data from the messager
         try {
             msgObj = JSON.parse(message);
         } catch (e) {
@@ -61,37 +54,70 @@ wsServer.on('connection', async (ws) => {
             return;
         }
 
-        if (msgObj.type === 'login') {
-            const { username, pass } = msgObj;
+        if (msgObj.type === 'login') {  // If the message is a loging message 
+            const { username, pass } = msgObj;  // passing data to username and pass array
 
             // Connect to MongoDB
+            const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true }); // modify to newst version
+            try {
+                await client.connect();   /// Conecing to the DB
+                const db = client.db('MonsterMayhemUsers'); //  creating a connection to the DB name
+                const users = db.collection('users'); // collection users to store the users of the Game
+
+                // Find user by username
+                const user = await users.findOne({ username }); // so if it finds a user mathching the data passed 
+
+                if (user && user.password === pass) { // and the password is correct , user.password accesing DB // 
+                    ws.send(JSON.stringify({ // SEND back the data by this we can say a user conection is accesed
+                        username: username,
+                        gamesPlayed: user.gamesPlayed,
+                        gamesWon: user.gamesWon
+                    }));
+                } else {       // If no right user and password from DB
+                    ws.send(JSON.stringify({ error: 'Invalid credentials' }));
+                }
+            } catch (error) { 
+                console.error('Error connecting to MongoDB:', error);
+            } finally {
+                await client.close();
+            }
+            ///////////////////Registration 
+        } else if (msgObj.type === 'register') {
+            const { username, password } = msgObj;
+
             const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
             try {
                 await client.connect();
                 const db = client.db('MonsterMayhemUsers');
-                const usersCollection = db.collection('users');
+                const users = db.collection('users');
 
-                // Find user by username
-                const user = await usersCollection.findOne({ username });
-
-                if (user && user.password === pass) {
-                    ws.send(JSON.stringify({ message: `Username - ${username}\nGames Played - ${user.gamesPlayed}\nGames Won - ${user.gamesWon}`,
-                    username  }));
+                const existingUser = await users.findOne({ username });
+                if (existingUser) {
+                    ws.send(JSON.stringify({ error: 'Username already exists' }));
                 } else {
-                    ws.send(JSON.stringify({ error: 'Invalid credentials' }));
+                    await users.insertOne({ username, password, gamesPlayed: 0, gamesWon: 0 });
+                    ws.send(JSON.stringify({ success: 'User registered successfully' }));
                 }
             } catch (error) {
                 console.error('Error connecting to MongoDB:', error);
+                ws.send(JSON.stringify({ error: 'Error registering user' }));
             } finally {
                 await client.close();
             }
         }
     });
 });
-//////////////////////
 
 
-///////////////////////////////////////////////
+// Serve the registration page
+app.get('/reg', (req, res) => {
+    res.render('reg');
+});
+//////////////////////////////////////////////////////////////////////////////////////////////
+let TestPosts = [
+    { title: 'Title', text: 'BlaBlablablabla' },
+    { title: 'two', text: 'BlaBlablablabla' }
+];
 app.get('/game', (req, res) => {
     res.render('game', { TestPosts });
 });
@@ -99,8 +125,8 @@ app.post('/new-post', (req, res) => {// writting on the testpost list
     TestPosts.push({ title: req.body.title, text: req.body.text });
     res.redirect('/game');
 });
-
-
+//////////////////////////////////////////////////////////////////////////////////////////////
+///////ADD user 
 /*async function connectToMongoDB() {
     const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
 

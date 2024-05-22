@@ -1,5 +1,6 @@
 <%- include("../partials/head.ejs") -%>
 <body>
+    <div id="login">
     <h1>Welcome to Mayhem Monster</h1>
     <p>Log in</p>
     <form id="loginForm">
@@ -10,9 +11,13 @@
         <button type="button" id="message">Login</button>
     </form>
     <p>
-        
-    </p>
-    <div id="messageOutput"></div>
+        <button type="button" id="registration">Register</button>
+    </p></div>
+    <div id="messageOutput">
+    <p id="usernameOutput"></p>
+    <p id="gamesPlayedOutput"></p>
+    <p id="gamesWonOutput"></p>
+    <button type="playButton" id="joingame">Play</button></div>
     <p>Visits <%= viewCount %></p>
     
 </body>
