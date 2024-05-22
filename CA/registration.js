@@ -4,7 +4,7 @@ socket.onopen = () => {
     console.log('WebSocket connection opened');
 };
 
-const registrationForm = document.getElementById("registrationForm");
+const registrationForm = document.getElementById("registrationForm"); // Registation form similar to app.js 
 if (registrationForm) {
     document.getElementById("submitRegistration").addEventListener("click", () => {
         const username = document.getElementById("username").value;
@@ -25,7 +25,7 @@ if (registrationForm) {
 socket.onmessage = (event) => {
     const data = JSON.parse(event.data);
     
-    if (!data.error) { // If the data contains username // meaning was succesfull
+    if (!data.error) { // If the data doesnt contain error it was send to moongo dB and stored 
         document.getElementById("messageOutput").textContent = "Welcome to Mayhem Monster!!  ";
     } else if (data.error) {
         document.getElementById("messageOutput").textContent = "Invalid Credentials";

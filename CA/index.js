@@ -53,7 +53,7 @@ wsServer.on('connection', async (ws) => { // connecting from the websocket
             ws.send(JSON.stringify({ error: 'Invalid message format' }));
             return;
         }
-
+///////////////////////////////////////////////////////////////////////////////////////////////////////
         if (msgObj.type === 'login') {  // If the message is a loging message 
             const { username, pass } = msgObj;  // passing data to username and pass array
 
@@ -72,6 +72,7 @@ wsServer.on('connection', async (ws) => { // connecting from the websocket
                         username: username,
                         gamesPlayed: user.gamesPlayed,
                         gamesWon: user.gamesWon
+
                     }));
                 } else {       // If no right user and password from DB
                     ws.send(JSON.stringify({ error: 'Invalid credentials' }));
@@ -81,7 +82,7 @@ wsServer.on('connection', async (ws) => { // connecting from the websocket
             } finally {
                 await client.close();
             }
-            ///////////////////Registration 
+ /////////////////////////////////////Registration/////////////// If the message is to register 
         } else if (msgObj.type === 'register') {
             const { username, password } = msgObj;
 
@@ -91,12 +92,12 @@ wsServer.on('connection', async (ws) => { // connecting from the websocket
                 const db = client.db('MonsterMayhemUsers');
                 const users = db.collection('users');
 
-                const existingUser = await users.findOne({ username });
+                const existingUser = await users.findOne({ username });      // similar to login but if user exist send error
                 if (existingUser) {
                     ws.send(JSON.stringify({ error: 'Username already exists' }));
                 } else {
-                    await users.insertOne({ username, password, gamesPlayed: 0, gamesWon: 0 });
-                    ws.send(JSON.stringify({ success: 'User registered successfully' }));
+                    await users.insertOne({ username, password, gamesPlayed: 0, gamesWon: 0 });  // insertOne to add data to the DB
+                    ws.send(JSON.stringify({ success: 'User registered successfully' })); 
                 }
             } catch (error) {
                 console.error('Error connecting to MongoDB:', error);
@@ -109,7 +110,7 @@ wsServer.on('connection', async (ws) => { // connecting from the websocket
 });
 
 
-// Serve the registration page
+// send signal to reg 
 app.get('/reg', (req, res) => {
     res.render('reg');
 });

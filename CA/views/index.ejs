@@ -1,26 +1,25 @@
 <%- include("../partials/head.ejs") -%>
-<body>
-    <div id="login">
-    <h1>Welcome to Mayhem Monster</h1>
-    <p>Log in</p>
-    <form id="loginForm">
-        <label for="username">Username</label>
-        <input type="text" name="username" required>
-        <label for="pass">Password</label>
-        <input type="password" name="pass" required>
-        <button type="button" id="message">Login</button>
-    </form>
-    <p>
-        <button type="button" id="registration">Register</button>
-    </p></div>
-    <div id="messageOutput">
-    <p id="usernameOutput"></p>
-    <p id="gamesPlayedOutput"></p>
-    <p id="gamesWonOutput"></p>
-    <button type="playButton" id="joingame">Play</button></div>
+    <div id="login" class="login-large">
+        <h1>Welcome to Monster Mayhem</h1>
+        <h4>Log in</h4>
+        <form id="loginForm">
+            <label for="username">Username</label>
+            <input type="text" name="username" required>
+            <label for="pass">Password</label>
+            <input type="password" name="pass" required>
+            <button type="button" id="message">Login</button>
+        </form>
+        <p>
+            <button type="button" id="registration">Register</button>
+        </p>
+    </div>
+    <div id="messageOutput" class="message-output-small">
+        <p id="usernameOutput"></p>
+        <p id="gamesPlayedOutput"></p>
+        <p id="gamesWonOutput"></p>
+        <button type="button" id="joingame">Play</button>
+    </div>
     <p>Visits <%= viewCount %></p>
-    
+    <script src="/app.js"></script>
 </body>
-
-<script  src="/app.js"></script>
 </html>
