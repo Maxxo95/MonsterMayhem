@@ -1,19 +1,21 @@
 <%- include("../partials/head.ejs") -%>
 <body>
-    <h1>Welcome</h1>
-    <p>Testing, testing, testing</p>
-    <form action="/userInfo" method="post">
-        <label for="username">Writte the username you want to use</label>
-        <input type="text" name="username">
-        <label for="age">Type your age</label>
-        <input type="text" name="age">
-        <input type="submit">
-
+    <h1>Welcome to Mayhem Monster</h1>
+    <p>Log in</p>
+    <form id="loginForm">
+        <label for="username">Username</label>
+        <input type="text" name="username" required>
+        <label for="pass">Password</label>
+        <input type="password" name="pass" required>
+        <button type="button" id="message">Login</button>
     </form>
-   <button id="message">Message</button>
-    <%- include("../partials/test.ejs") -%>
-
-    <p>View Count <%= viewCount %></p>
+    <p>
+        
+    </p>
+    <div id="messageOutput"></div>
+    <p>Visits <%= viewCount %></p>
+    
 </body>
-<script src="/app.js"></script>
+<script src="https://cdn.socket.io/socket.io-3.0.0.js"></script>
+<script  src="/app.js"></script>
 </html>

@@ -1,78 +1,115 @@
-const express = require("express");
-const bodyParser = require("body-parser");
-const ejs = require("ejs");
+const express = require('express');
+const bodyParser = require('body-parser');
+const ejs = require('ejs');
 const path = require('path');
-const { WebSocketServer } = require("ws");
+const { WebSocketServer } = require('ws');
+const http = require('http');
+//const socketIO = require('socket.io');
 
-//specify port comand line
-///////////////////////////////////////////WEBSOCKETS INTRODUCE 
-const WebSocket = require('ws')
-//const server = new WebSocket.Server( {port : '2000'})
-////////////////////////////////////////// web build
-const PORT = (process.argv[2] || 3000);
-app = express()
-app.use(bodyParser.urlencoded({ extended: true}));
-app.set("view engine", "ejs");
-app.use(express.static(path.join(__dirname, '.')));
-///////////////////////////////////////variables
-let viewCount = 0; // count of page views
-let TestPosts =[
-    { title: "Title", text: "BlaBlablablabla"},
-    { title: "two", text: "BlaBlablablabla"}
-]
-////////////////////////////////////////
-//////////////////////////////////////////// Index mapping , get
-app.get ("/", (req,res) => {       
-console.log("New visitor");
-//console.log(req);
-viewCount += 1;
-res.render("index.ejs" , {viewCount});
+// Web build
+const PORT = process.argv[2] || 3000;
+const app = express();
+const httpServer = http.createServer(app);
+
+app.use(bodyParser.urlencoded({ extended: true }));
+app.set('view engine', 'ejs');
+app.use(express.static(path.join(__dirname, '.')));// location of app.js root 
+
+// Variables
+let viewCount = 0;
+let TestPosts = [
+    { title: 'Title', text: 'BlaBlablablabla' },
+    { title: 'two', text: 'BlaBlablablabla' }
+];
+let Users = [
+    { username: 'Max', pass: 'pass1234' },
+    { username: 'Sam', pass: 'pass1234' }
+];
+
+////////////////////////////////////////////////// Routes
+app.get('/', (req, res) => {
+    console.log('Welcome Visitor');
+    viewCount += 1;
+    res.render('index', { viewCount });
+});
+
+const server = http.createServer(app);
+const wsServer = new WebSocketServer({ noServer: true });
+//const wsServer = new WebSocketServer({ server });
+
+wsServer.on('connection', (ws) => {
+    ws.on('message', (message) => {
+        let msgObj;
+        try {
+            msgObj = JSON.parse(message);
+        } catch (e) {
+            ws.send(JSON.stringify({ error: 'Invalid message format' }));
+            return;
+        }
+
+        if (msgObj.type === 'login') {
+            const { username, pass } = msgObj;
+            const user = Users.find(u => u.username === username && u.pass === pass);
+
+            if (user) {
+                ws.send(JSON.stringify({ message: `Username - ${username} - Succesfull Login`, username }));
+            } else {
+                ws.send(JSON.stringify({ error: 'Invalid credentials' }));
+            }
+        }
+    });
 });
 
 
-/////////////////////EXample  %blabla&%bla  
-app.get("/parsing/:display", (req, res) => {
-res.send(req.params.display);
+///////////////////////////////////////////////
+app.get('/game', (req, res) => {
+    res.render('game', { TestPosts });
 });
-////////////////////////Example  
-app.get("/rest", (req,res)=> { // rest?text=Testing&number=100
-    res.send(`The number is: ${req.query.number} and the text is: ${req.query.text}`);
-});
-
-
-//// on another ejs file passing data to  game
-app.get("/game", (req,res) => {
-    res.render("game", { TestPosts}); //from testpost previously created 
-});
-//Form index  user information    get info from index form
-app.post("/userInfo", (req,res)=> {
-    res.send(`Hello - ${req.body.username} , Info -age -${req.body.age}`);
+app.post('/new-post', (req, res) => {// writting on the testpost list
+    TestPosts.push({ title: req.body.title, text: req.body.text });
+    res.redirect('/game');
 });
 
-app.post("/new-post", (req,res) => {
-TestPosts.push({ title: req.body.title, text: req.body.text})// push on the list
-res.redirect("/game");// use the previous creathed method 
-});
 
-const httpServer = app.listen(PORT, () => {
+// Start server
+httpServer.listen(PORT, () => {
     console.log(`Listening on port ${PORT}`);
 });
-/*
-server.on('connection', socket =>{
-    socket.on('message', message => {
-        socket.send(` Recived, CCT test ${message}`)
-    })
-})*/
 
-const wsServer = new WebSocket.Server({ noServer : true })
-httpServer.on('upgrade', (request, socket, head)=> {
-    wsServer.handleUpgrade(request, socket, head, (ws)=>{
+// WebSocket server
+httpServer.on('upgrade', (request, socket, head) => {
+    wsServer.handleUpgrade(request, socket, head, (ws) => {
         wsServer.emit('connection', ws, request);
     });
 });
 
-wsServer.on('connection', (ws) =>{
-    ws.on('message', message => {
+wsServer.on('connection', (ws) => {
+    ws.on('message', (message) => {
         console.log(message);
-    })
-})
+    });
+});
+
+/*
+// Socket.IO server
+const io = require('socket.io')(httpServer, {
+    cors: { origin: "*" }
+});
+
+io.on('connection', (socket2) => {
+    console.log('a user connected');
+
+    socket2.on('message', (message) => {
+        console.log(message);
+        io.emit('message', `${ws.id.substr(0, 2)} said ${message}`);
+    });
+});
+
+
+app.get('/parsing/:display', (req, res) => {
+    res.send(req.params.display);
+});
+
+app.get('/rest', (req, res) => {
+    res.send(`The number is: ${req.query.number} and the text is: ${req.query.text}`);
+});
+*/
