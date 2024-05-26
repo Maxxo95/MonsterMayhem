@@ -20,6 +20,7 @@ const uri = 'mongodb://localhost:27017';
 
 /// Variables
 let viewCount = 0;
+let players = [];
 ////////////////////////////////////////////////// Routes
 app.get('/', (req, res) => {
     console.log('Welcome Visitor');
@@ -105,73 +106,43 @@ wsServer.on('connection', async (ws) => { // connecting from the websocket
             } finally {
                 await client.close();
             }
+   /////////////////////////////Joining a game message///////////////////////////  After logged        
+        }else if (msgObj.type === 'joinGame') {// 
+            const { username } = msgObj;  
+            if (!players.some(player => player.username === username)) {
+                players.push({ username, ws });// adding the user to the players list
+            }
+        
+            if (players.length >= 4) {// if players reach the number required create a new group, if more a group should be full and passed for game
+                const gamePlayers = players.slice(0, 4); // helper array to manage data
+                players = players.slice(4); // Remove these players from the queue
+        
+                const playerUsernames = gamePlayers.map(player => player.username);//map of players in the game
+        
+                for (const player of gamePlayers) {// for the each player on gamePlayers, 
+                    player.ws.send(JSON.stringify({
+                        players: playerUsernames, // list of names of players  
+                        message: 'Game is starting!' // 
+                    }));
+                }
+            } else {// else if the group is less than 4 
+const waitingPlayers = players.map(player => player.username);// Pass this variable out the function for develop game?
+                ws.send(JSON.stringify({
+                    players: waitingPlayers,
+                    message: 'Waiting for more players to join...'
+                }));
+            }
         }
-    });
-});
+        });
+        // if a player leave 
+        ws.on('close', () => {
+        players = players.filter(player => player.ws !== ws);
+        });
+        });
+        
 
-
-// send signal to reg 
+// send signal to reg fro ejs to connect to the server 
 app.get('/reg', (req, res) => {
     res.render('reg');
 });
 //////////////////////////////////////////////////////////////////////////////////////////////
-let TestPosts = [
-    { title: 'Title', text: 'BlaBlablablabla' },
-    { title: 'two', text: 'BlaBlablablabla' }
-];
-app.get('/game', (req, res) => {
-    res.render('game', { TestPosts });
-});
-app.post('/new-post', (req, res) => {// writting on the testpost list
-    TestPosts.push({ title: req.body.title, text: req.body.text });
-    res.redirect('/game');
-});
-//////////////////////////////////////////////////////////////////////////////////////////////
-///////ADD user 
-/*async function connectToMongoDB() {
-    const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
-
-
-    try {
-        await client.connect();
-        console.log('Connected to MongoDB successfully!');
-
-
-        const db = client.db('MonsterMayhemUsers'); // Use your database name
-
-
-        // Create the 'users' collection
-        const usersCollection = db.collection('users');
-
-
-        // Insert a sample user document
-        await usersCollection.insertOne({
-            username: 'Shelly',
-            password: 'ratito',
-            gamesPlayed: 0,
-            gamesWon: 0
-        });
-        const foundUser = await usersCollection.findOne({ username: 'Shelly' });
-      console.log('Found user:', foundUser);
-
-
-       console.log('User data inserted successfully!');
-
-
-
-
-    } catch (error) {
-        console.error('Error connecting to MongoDB:', error);
-    } finally {
-        await client.close();
-    }
-}
-
-
-connectToMongoDB();
-
-
-*/ 
-
-
-

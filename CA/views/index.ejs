@@ -1,6 +1,8 @@
 <%- include("../partials/head.ejs") -%>
+<body>
+    <h1> Monster Mayhem</h1>
     <div id="login" class="login-large">
-        <h1>Welcome to Monster Mayhem</h1>
+     
         <h4>Log in</h4>
         <form id="loginForm">
             <label for="username">Username</label>
@@ -19,6 +21,16 @@
         <p id="gamesWonOutput"></p>
         <button type="button" id="joingame">Play</button>
     </div>
+    <div id="playerboard" class="pboard">
+        <p id="player1"></p>
+        <p id="player2"></p>
+        <p id="player3"></p>
+        <p id="player4"></p>
+    </div>
+    <div id="gameBoard" class="board"></div>
+
+    <p id="messageOutputText"></p>
+    <br><br><br>
     <p>Visits <%= viewCount %></p>
     <script src="/app.js"></script>
 </body>
