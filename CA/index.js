@@ -21,6 +21,7 @@ const uri = 'mongodb://localhost:27017';
 /// Variables
 let viewCount = 0;
 let players = [];
+const sides = ['North', 'South', 'East', 'West'];
 ////////////////////////////////////////////////// Routes
 app.get('/', (req, res) => {
     console.log('Welcome Visitor');
@@ -44,7 +45,7 @@ httpServer.on('upgrade', (request, socket, head) => {
         wsServer.emit('connection', ws, request);
     });
 });
-//////////////////Login authentication
+/////////////////Connetion WS
 wsServer.on('connection', async (ws) => { // connecting from the websocket 
     ws.on('message', async (message) => { // assesing the message info passed by the front end app.js
         let msgObj;    //// try catch for the JSON.parse data from the messager
@@ -55,6 +56,7 @@ wsServer.on('connection', async (ws) => { // connecting from the websocket
             return;
         }
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////// Messages exchange 
         if (msgObj.type === 'login') {  // If the message is a loging message 
             const { username, pass } = msgObj;  // passing data to username and pass array
 
@@ -107,42 +109,79 @@ wsServer.on('connection', async (ws) => { // connecting from the websocket
                 await client.close();
             }
    /////////////////////////////Joining a game message///////////////////////////  After logged        
-        }else if (msgObj.type === 'joinGame') {// 
-            const { username } = msgObj;  
+        }else   if (msgObj.type === 'joinGame') {
+            const { username } = msgObj;
+           
             if (!players.some(player => player.username === username)) {
-                players.push({ username, ws });// adding the user to the players list
+                players.push({ username, ws });
             }
-        
-            if (players.length >= 4) {// if players reach the number required create a new group, if more a group should be full and passed for game
-                const gamePlayers = players.slice(0, 4); // helper array to manage data
-                players = players.slice(4); // Remove these players from the queue
-        
-                const playerUsernames = gamePlayers.map(player => player.username);//map of players in the game
-        
-                for (const player of gamePlayers) {// for the each player on gamePlayers, 
-                    player.ws.send(JSON.stringify({
-                        players: playerUsernames, // list of names of players  
-                        message: 'Game is starting!' // 
-                    }));
-                }
-            } else {// else if the group is less than 4 
-const waitingPlayers = players.map(player => player.username);// Pass this variable out the function for develop game?
+            shuffleArray(sides);
+            const slidesTemp = [];
+            slidesTemp.push(sides , ws)  ; 
+          
+            if (players.length >= 4) {
+                const gamePlayers = players.slice(0, 4);
+                players = players.slice(4);
+              
+                const playerUsernames = gamePlayers.map(player => player.username);
+            
+               
+            
+                // 
+                ws.send(JSON.stringify({
+                    players: playerUsernames,
+                    sides: sides,
+                    message: 'Game is startingg!'
+                }));
+            
+            
+               
+            
+               /* let playerMonsters = gamePlayers.reduce((acc, player) => {
+                    acc[player.username] = 0;
+                    return acc;
+                }, {});*/
+            
+              //  determineFirstPlayer(playerMonsters, gamePlayers);
+            } else {
+                const waitingPlayers = players.map(player => player.username);
                 ws.send(JSON.stringify({
                     players: waitingPlayers,
+                    sides: 'Side of the board',
                     message: 'Waiting for more players to join...'
                 }));
             }
+            
         }
-        });
-        // if a player leave 
-        ws.on('close', () => {
+    });
+
+    ws.on('close', () => {
         players = players.filter(player => player.ws !== ws);
-        });
-        });
-        
+    });
+});
+
 
 // send signal to reg fro ejs to connect to the server 
 app.get('/reg', (req, res) => {
     res.render('reg');
 });
 //////////////////////////////////////////////////////////////////////////////////////////////
+function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+}
+
+function determineFirstPlayer(playerMonsters, gamePlayers) {
+    const fewestMonsters = Math.min(...Object.values(playerMonsters));
+    const candidates = gamePlayers.filter(player => playerMonsters[player.username] === fewestMonsters);
+    const firstPlayer = candidates[Math.floor(Math.random() * candidates.length)].username;
+
+    for (const player of gamePlayers) {
+        player.ws.send(JSON.stringify({
+            firstPlayer: firstPlayer,
+            message: `${firstPlayer} goes first!`
+        }));
+    }
+}

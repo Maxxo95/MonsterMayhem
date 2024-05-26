@@ -2,13 +2,10 @@
 
 const socket = new WebSocket('ws://localhost:3000');
 Boolean:looged = false;
-//  incoming messages to HTML
-
-
-
 
 // Send a message when the button is clicked to the Index.js (backend)
 const button = document.getElementById("message");
+/////////////////////// button log in 
 button.addEventListener("click", () => {
     const username = document.querySelector('input[name="username"]').value;
     const pass = document.querySelector('input[name="pass"]').value;
@@ -20,53 +17,60 @@ button.addEventListener("click", () => {
     socket.send(JSON.stringify(loginMessage));
 });
 
-socket.onopen = () => { 
-    console.log('WebSocket connection opened');
-};
-
 // Handle registration button  to /reg
 const registrationButton = document.getElementById("registration");
 
 registrationButton.addEventListener("click", () => {
     window.location.href = '/reg';
 });
-
-
-socket.onmessage = (event) => {
-    const data = JSON.parse(event.data);
-    
-    if (data.username) { //for websocket requiring username succesfully
-        username = data.username;
-        document.getElementById("usernameOutput").textContent = `Username: ${data.username}`;
-        document.getElementById("gamesPlayedOutput").textContent = `Games Played: ${data.gamesPlayed}`;
-        document.getElementById("gamesWonOutput").textContent = `Games Won: ${data.gamesWon}`;
-        login(); 
-        createBoard();
-    } else if (data.error) {
-        document.getElementById("messageOutput").textContent = "Invalid Credentials";
-        console.error('Error from server', data.error);
-    } else if (data.players) {
-        // Update the player board with the list of players
-        for (let i = 0; i < data.players.length; i++) {
-            document.getElementById(`player${i + 1}`).textContent = data.players[i];
-        }
-        document.getElementById("messageOutput").textContent = data.message || '';
-    }
-};
-
+// Handle play button 
 // Send a message when the join game button is clicked to the backend
 const joinGameButton = document.getElementById("joingame");
 joinGameButton.addEventListener("click", () => {
     if (username) {
         const joinGameMessage = {
-            type: 'joinGame',
+            type: 'joinGame',  
             username: username
         };
-        socket.send(JSON.stringify(joinGameMessage));
+        socket.send(JSON.stringify(joinGameMessage)); // send info of the user wanting to join a game 
     } else {
-        document.getElementById("messageOutput").textContent = "You need to log in first.";
+        document.getElementById("messageOutput").textContent = "You need to log in first."; // if you click and are not logged in wont let u play 
     }
 });
+////////////////// socket connection 
+socket.onopen = () => { 
+    console.log('WebSocket connection opened');
+};socket.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+
+    console.log('Received data from server:', data);
+
+    if (data.username) {
+        username = data.username;
+        document.getElementById("usernameOutput").textContent = `Username: ${data.username}`;
+        document.getElementById("gamesPlayedOutput").textContent = `Games Played: ${data.gamesPlayed}`;
+        document.getElementById("gamesWonOutput").textContent = `Games Won: ${data.gamesWon}`;
+        login();
+        createBoard();
+    } else if (data.error) {
+        document.getElementById("messageOutput").textContent = "Invalid Credentials";
+        console.error('Error from server', data.error);
+    }  else if (data.players) {
+        // Clear the message output div before updating
+       
+    
+        // Handle game start and display player sides
+        const sidesData = data.sides; // Rename sides to sidesData to avoid conflict
+      document.getElementById("messageOutput").innerHTML = `${data.players}  <br> ${data.sides}<br>${data.message || 'Game is starting!'} `;
+    
+        console.log('Game is starting with the following data:');
+        console.log('Players:', data.players);
+        console.log('Sides:', sidesData); // Log sidesData instead of data.sides
+    }
+    
+};
+
+
 /////////////////////////////////
 ///////////////////////////////////Board (May simplify if trouble when building game)
 ////////////////////////////////////
@@ -175,7 +179,6 @@ function updateUI() {
         joinGameButton.style.display = 'none'; // Hide the play button
         loginDiv.classList.remove('login-small');
         loginDiv.classList.add('login-large');
-        messageOutputDiv.classList.remove('message-output-large');
-        messageOutputDiv.classList.add('message-output-small');
+        
     }
 }
