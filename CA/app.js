@@ -61,11 +61,9 @@ socket.onopen = () => {
     
         // Handle game start and display player sides
         const sidesData = data.sides; // Rename sides to sidesData to avoid conflict
-      document.getElementById("messageOutput").innerHTML = `${data.players}  <br> ${data.sides}<br>${data.message || 'Game is starting!'} `;
-    
-        console.log('Game is starting with the following data:');
-        console.log('Players:', data.players);
-        console.log('Sides:', sidesData); // Log sidesData instead of data.sides
+        document.getElementById("messageOutput").innerHTML = `${data.players.join(', ')} <br> Monsters: ${JSON.stringify(data.playerMonsters)}<br> Eliminations: ${JSON.stringify(data.playerEliminations)}<br> Sides: ${data.sides}<br> First Player: ${data.firstPlay}<br> ${data.message || 'Game is starting!'} `;
+
+     
     }
     
 };

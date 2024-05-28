@@ -19,6 +19,7 @@ const { MongoClient } = require('mongodb');
 const uri = 'mongodb://localhost:27017';
 
 /// Variables
+let gameState = {};
 let viewCount = 0;
 let players = [];
 const sides = ['North', 'South', 'East', 'West'];
@@ -55,8 +56,8 @@ wsServer.on('connection', async (ws) => { // connecting from the websocket
             ws.send(JSON.stringify({ error: 'Invalid message format' }));
             return;
         }
-///////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////// Messages exchange 
+        ///////////////////////////////////////////////////////////////////////////////////////////////////////
+        ////////////// Messages exchange 
         if (msgObj.type === 'login') {  // If the message is a loging message 
             const { username, pass } = msgObj;  // passing data to username and pass array
 
@@ -80,12 +81,12 @@ wsServer.on('connection', async (ws) => { // connecting from the websocket
                 } else {       // If no right user and password from DB
                     ws.send(JSON.stringify({ error: 'Invalid credentials' }));
                 }
-            } catch (error) { 
+            } catch (error) {
                 console.error('Error connecting to MongoDB:', error);
             } finally {
                 await client.close();
             }
- /////////////////////////////////////Registration/////////////// If the message is to register 
+            /////////////////////////////////////Registration/////////////// If the message is to register 
         } else if (msgObj.type === 'register') {
             const { username, password } = msgObj;
 
@@ -100,7 +101,7 @@ wsServer.on('connection', async (ws) => { // connecting from the websocket
                     ws.send(JSON.stringify({ error: 'Username already exists' }));
                 } else {
                     await users.insertOne({ username, password, gamesPlayed: 0, gamesWon: 0 });  // insertOne to add data to the DB
-                    ws.send(JSON.stringify({ success: 'User registered successfully' })); 
+                    ws.send(JSON.stringify({ success: 'User registered successfully' }));
                 }
             } catch (error) {
                 console.error('Error connecting to MongoDB:', error);
@@ -108,41 +109,54 @@ wsServer.on('connection', async (ws) => { // connecting from the websocket
             } finally {
                 await client.close();
             }
-   /////////////////////////////Joining a game message///////////////////////////  After logged        
-        }else   if (msgObj.type === 'joinGame') {
+            /////////////////////////////Joining a game message///////////////////////////  After logged        
+        } else if (msgObj.type === 'joinGame') {
             const { username } = msgObj;
-           
+
             if (!players.some(player => player.username === username)) {
                 players.push({ username, ws });
             }
             shuffleArray(sides);
             const slidesTemp = [];
-            slidesTemp.push(sides , ws)  ; 
-          
+            slidesTemp.push(sides, ws);
+
             if (players.length >= 4) {
                 const gamePlayers = players.slice(0, 4);
                 players = players.slice(4);
-              
+
                 const playerUsernames = gamePlayers.map(player => player.username);
-            
-               
-            
-                // 
-                ws.send(JSON.stringify({
-                    players: playerUsernames,
-                    sides: sides,
-                    message: 'Game is startingg!'
-                }));
-            
-            
-               
-            
-               /* let playerMonsters = gamePlayers.reduce((acc, player) => {
+
+
+
+                let board = createEmptyBoard();
+
+                let playerMonsters = gamePlayers.reduce((acc, player) => {
                     acc[player.username] = 0;
                     return acc;
-                }, {});*/
-            
-              //  determineFirstPlayer(playerMonsters, gamePlayers);
+                }, {});
+                let playerEliminations = gamePlayers.reduce((acc, player) => {
+                    acc[player.username] = 0;
+                    return acc;
+                }, {});
+
+                // Sending game start message to all 4 players
+                const firstPlayer =  determineFirstPlayer(playerMonsters, gamePlayers);
+                const gameState = gamePlayers.map(player => player.ws.send(JSON.stringify({
+                    players: playerUsernames,
+                    playerMonsters : playerMonsters,
+                    playerEliminations: playerEliminations,
+                    sides: sides,
+                    firstPlay : firstPlayer,
+                    message: 'Game is starting!',
+                   round: 0,
+                   board : board 
+                })));
+
+                // Wait for all messages to be sent
+                await Promise.all(gameState);
+
+
+             
             } else {
                 const waitingPlayers = players.map(player => player.username);
                 ws.send(JSON.stringify({
@@ -150,8 +164,9 @@ wsServer.on('connection', async (ws) => { // connecting from the websocket
                     sides: 'Side of the board',
                     message: 'Waiting for more players to join...'
                 }));
+               
             }
-            
+
         }
     });
 
@@ -172,11 +187,10 @@ function shuffleArray(array) {
         [array[i], array[j]] = [array[j], array[i]];
     }
 }
-
 function determineFirstPlayer(playerMonsters, gamePlayers) {
     const fewestMonsters = Math.min(...Object.values(playerMonsters));
     const candidates = gamePlayers.filter(player => playerMonsters[player.username] === fewestMonsters);
-    const firstPlayer = candidates[Math.floor(Math.random() * candidates.length)].username;
+    let firstPlayer = candidates[Math.floor(Math.random() * candidates.length)].username;
 
     for (const player of gamePlayers) {
         player.ws.send(JSON.stringify({
@@ -184,4 +198,15 @@ function determineFirstPlayer(playerMonsters, gamePlayers) {
             message: `${firstPlayer} goes first!`
         }));
     }
+
+    return firstPlayer; // Return firstPlayer value for access outside the function
+}
+
+
+function createEmptyBoard() {
+    const board = [];
+    for (let row = 0; row < 10; row++) {
+        board[row] = Array(10).fill(null);
+    }
+    return board;
 }
