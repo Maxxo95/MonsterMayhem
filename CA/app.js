@@ -2,7 +2,8 @@
 
 const socket = new WebSocket('ws://localhost:3000');
 Boolean:looged = false;
-
+let playerSide = null;
+let currentPlayer = null;
 // Send a message when the button is clicked to the Index.js (backend)
 const button = document.getElementById("message");
 /////////////////////// button log in 
@@ -40,6 +41,8 @@ joinGameButton.addEventListener("click", () => {
 ////////////////// socket connection 
 socket.onopen = () => { 
     console.log('WebSocket connection opened');
+    socket.send(JSON.stringify({ type: 'joinGame', username: username }));
+   
 };socket.onmessage = (event) => {
     const data = JSON.parse(event.data);
 
@@ -55,31 +58,44 @@ socket.onopen = () => {
     } else if (data.error) {
         document.getElementById("messageOutput").textContent = "Invalid Credentials";
         console.error('Error from server', data.error);
-    }  else if (data.players) {
-        // Clear the message output div before updating
-       
-    
-        // Handle game start and display player sides
-        const sidesData = data.sides; // Rename sides to sidesData to avoid conflict
-        document.getElementById("messageOutput").innerHTML = `${data.players.join(', ')} <br> Monsters: ${JSON.stringify(data.playerMonsters)}<br> Eliminations: ${JSON.stringify(data.playerEliminations)}<br> Sides: ${data.sides}<br> First Player: ${data.firstPlay}<br> ${data.message || 'Game is starting!'} `;
-
-     
+    }  if (data.players) {
+        document.getElementById("messageOutput").innerHTML = `
+            Players: ${data.players.join(', ')} <br>
+            Monsters: ${JSON.stringify(data.playerMonsters)} <br>
+            Eliminations: ${JSON.stringify(data.playerEliminations)} <br>
+            Sides: ${data.sides} <br>
+            First Player: ${data.currentPlayer} <br>
+            ${data.message || 'Game is starting!'}
+        `;
+        updateBoard(data.board);
+        playerSide = data.playerSides[username];
+        currentPlayer = data.currentPlayer;
+        console.log("Player Side:", playerSide);
+        console.log("Current Player:", currentPlayer);
+    } else if (data.board) {
+        updateBoard(data.board);
+        currentPlayer = data.currentPlayer;
+        console.log("Current Player:", currentPlayer);
+    } else if (data.currentPlayer) {
+        currentPlayer = data.currentPlayer;
+        document.getElementById("messageOutput").innerHTML += `<br>${data.message}`;
+        console.log("Current Player Updated:", currentPlayer);
     }
-    
 };
+
+
 
 
 /////////////////////////////////
 ///////////////////////////////////Board (May simplify if trouble when building game)
 ////////////////////////////////////
-function createBoard() { //// Board Made with chat gp creating a board that has 10 by 10 and adding rows to label a-z horizontal and 1-9 vertical
+function createBoard() {
     const board = document.getElementById('gameBoard');
     board.style.gridTemplateColumns = '50px repeat(10, 50px) 30px';
     board.style.gridTemplateRows = '50px repeat(10, 50px) 30px';
 
     const columns = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
 
-    // Create the top row of headers
     const emptyCorner = document.createElement('div');
     emptyCorner.classList.add('cell', 'header');
     board.appendChild(emptyCorner);
@@ -95,19 +111,19 @@ function createBoard() { //// Board Made with chat gp creating a board that has 
     emptyTopRight.classList.add('cell', 'header');
     board.appendChild(emptyTopRight);
 
-    // Create the rows
     for (let row = 0; row < 10; row++) {
         const rowHeader = document.createElement('div');
         rowHeader.classList.add('cell', 'header');
-        rowHeader.textContent = row;
+        rowHeader.textContent = row + 1;
         board.appendChild(rowHeader);
 
         for (let col = 0; col < 10; col++) {
             const cell = document.createElement('div');
             cell.classList.add('cell');
             cell.dataset.row = row;
-            cell.dataset.col = columns[col];
-            cell.dataset.index = `${columns[col]}${row}`;
+            cell.dataset.col = col;
+            cell.dataset.index = `${columns[col]}${row + 1}`;
+            cell.addEventListener('click', () => handleCellClick(row, col));
             board.appendChild(cell);
         }
 
@@ -116,7 +132,6 @@ function createBoard() { //// Board Made with chat gp creating a board that has 
         board.appendChild(rightRowHeader);
     }
 
-    // Create the bottom row of headers
     const emptyBottomLeft = document.createElement('div');
     emptyBottomLeft.classList.add('cell', 'header');
     board.appendChild(emptyBottomLeft);
@@ -132,7 +147,41 @@ function createBoard() { //// Board Made with chat gp creating a board that has 
     board.appendChild(emptyBottomRight);
 }
 
+function handleCellClick(row, col) {
+    // Validate the move based on the player's side
+    const validMove = 
+        (playerSide === 'top' && row === 0) ||
+        (playerSide === 'bottom' && row === 9) ||
+        (playerSide === 'left' && col === 0) ||
+        (playerSide === 'right' && col === 9);
 
+    if (!validMove) {
+        alert('You can only place a monster on your designated side.');
+        return;
+    }
+
+    // Check if it's the current player's turn
+    if (currentPlayer !== username) {
+        alert('It is not your turn.');
+        return;
+    }
+
+    // Send the move to the server
+    const monster = prompt("Enter the monster type (vampire, werewolf, ghost):");
+    if (monster) {
+        const message = JSON.stringify({ type: 'makeMove', monster: monster, row: row, col: col });
+        socket.send(message);
+    }
+}
+
+function updateBoard(board) {
+    for (let row = 0; row < board.length; row++) {
+        for (let col = 0; col < board[row].length; col++) {
+            const cell = document.querySelector(`.cell[data-row='${row}'][data-col='${col}']`);
+            cell.textContent = board[row][col] ? board[row][col] : '';
+        }
+    }
+}
 
 
 //////////////////////////////////////////////////

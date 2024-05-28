@@ -141,21 +141,32 @@ wsServer.on('connection', async (ws) => { // connecting from the websocket
 
                 // Sending game start message to all 4 players
                 const firstPlayer =  determineFirstPlayer(playerMonsters, gamePlayers);
-                const gameState = gamePlayers.map(player => player.ws.send(JSON.stringify({
+                let gameState = {
                     players: playerUsernames,
-                    playerMonsters : playerMonsters,
+                    playerMonsters: playerMonsters,
                     playerEliminations: playerEliminations,
                     sides: sides,
-                    firstPlay : firstPlayer,
-                    message: 'Game is starting!',
-                   round: 0,
-                   board : board 
+                    currentPlayer: firstPlayer,
+                    currentTurn: 1,
+                    board: board,
+                    playerSides: {
+                        [playerUsernames[0]]: 'top',    // Player 1
+                        [playerUsernames[1]]: 'bottom', // Player 2
+                        [playerUsernames[2]]: 'left',   // Player 3
+                        [playerUsernames[3]]: 'right'   // Player 4
+                    }
+                };
+        
+                // Sending game start message to all 4 players
+                const promises = gamePlayers.map(player => player.ws.send(JSON.stringify({
+                    ...gameState,
+                    message: 'Game is starting!'
                 })));
+    
+                await Promise.all(promises);
+    
 
-                // Wait for all messages to be sent
-                await Promise.all(gameState);
-
-
+                handleTurn(gameState, gamePlayers);
              
             } else {
                 const waitingPlayers = players.map(player => player.username);
@@ -201,7 +212,49 @@ function determineFirstPlayer(playerMonsters, gamePlayers) {
 
     return firstPlayer; // Return firstPlayer value for access outside the function
 }
+async function handleTurn(gameState, gamePlayers) {
+    while (true) {
+        const currentPlayer = gamePlayers.find(player => player.username === gameState.currentPlayer);
 
+        // Wait for the current player to make a move
+        await new Promise(resolve => {
+            currentPlayer.ws.once('message', (message) => {
+                const msgObj = JSON.parse(message);
+
+                if (msgObj.type === 'makeMove') {
+                    const { monster, row, col } = msgObj;
+
+                    // Place the monster on the board
+                    gameState.board[row][col] = monster;
+                    gameState.playerMonsters[gameState.currentPlayer]++;
+
+                    // Broadcast the updated game state
+                    const promises = gamePlayers.map(player => player.ws.send(JSON.stringify({
+                        ...gameState,
+                        message: `${gameState.currentPlayer} placed a ${monster} at ${String.fromCharCode(65 + col)}${row + 1}`
+                    })));
+
+                    Promise.all(promises).then(() => {
+                        // End the current turn
+                        gameState.currentTurn++;
+                        const nextPlayerIndex = (gameState.players.indexOf(gameState.currentPlayer) + 1) % gameState.players.length;
+                        gameState.currentPlayer = gameState.players[nextPlayerIndex];
+
+                        // Notify all players of the new current player
+                        const nextTurnPromises = gamePlayers.map(player => player.ws.send(JSON.stringify({
+                            currentPlayer: gameState.currentPlayer,
+                            message: `It is now ${gameState.currentPlayer}'s turn`
+                        })));
+
+                        Promise.all(nextTurnPromises).then(() => {
+                            resolve(); // Proceed to the next turn
+                        });
+                    });
+                }
+            });
+        });
+    }
+}
 
 function createEmptyBoard() {
     const board = [];
