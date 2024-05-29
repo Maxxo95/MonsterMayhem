@@ -176,7 +176,7 @@ function handleCellClick(row, col) {
 
         if (isValidMove(fromRow, fromCol, row, col) && !cellContent) {
             // Send the move to the server to move the selected monster
-            const message = JSON.stringify({ type: 'makeMove', action: 'move', monster, fromRow, fromCol, toRow: row, toCol: col });
+            const message = JSON.stringify({ type: 'makeMove', action: 'move', username, monster, fromRow, fromCol, toRow: row, toCol: col });
             socket.send(message);
             selectedMonster = null; // Clear the selected monster after the move is sent
         } else {
@@ -203,7 +203,7 @@ function handleCellClick(row, col) {
                 }
 
                 // Send the move to the server to place a new monster
-                const message = JSON.stringify({ type: 'makeMove', action: 'place', monster, row, col });
+                const message = JSON.stringify({ type: 'makeMove', action: 'place', username, monster, row, col });
                 socket.send(message);
             }
         } else {
@@ -216,10 +216,11 @@ function handleCellClick(row, col) {
 const endTurnButton = document.createElement('button');
 endTurnButton.textContent = 'End Turn';
 endTurnButton.onclick = function() {
-    const message = JSON.stringify({ type: 'endTurn' });
+    const message = JSON.stringify({ type: 'endTurn', username });
     socket.send(message);
 };
 document.body.appendChild(endTurnButton);
+
 
 function updateBoard(board) {
     for (let row = 0; row < board.length; row++) {
