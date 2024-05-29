@@ -60,15 +60,16 @@ socket.onopen = () => {
     } else if (data.error) {
         document.getElementById("messageOutput").textContent = "Invalid Credentials";
         console.error('Error from server', data.error);
-    }  if (data.players) {
+    }  else   if (data.players) {
+        // Display initial game information
         document.getElementById("messageOutput").innerHTML = `
-        User : ${username}  <br> 
-        Side : ${playerSide}   <br>
-        Players: ${data.players.join(', ')} <br>
+            User: ${username} <br>
+            Side: ${playerSide} <br>
+            Players: ${data.players.join(', ')} <br>
             Monsters: ${JSON.stringify(data.playerMonsters)} <br>
             Eliminations: ${JSON.stringify(data.playerEliminations)} <br>
-            Current  player : ${data.currentPlayer} <br>
-            ${data.message || 'Game is starting!'} 
+            Current player: ${data.currentPlayer} <br>
+            ${data.message || 'Game is starting!'}
         `;
         updateBoard(data.board);
         playerSide = data.playerSides[username];
@@ -76,17 +77,22 @@ socket.onopen = () => {
         console.log("Player Side:", playerSide);
         console.log("Current Player:", currentPlayer);
     } else if (data.board) {
+        // Update board state and current player
         updateBoard(data.board);
         currentPlayer = data.currentPlayer;
         console.log("Current Player:", currentPlayer);
     } else if (data.currentPlayer) {
+        // Update only the current player and display the message
         currentPlayer = data.currentPlayer;
         console.log("Current Player Updated:", currentPlayer);
         document.getElementById("messageOutput").innerHTML += `<br>${data.message}`;
-        
+    }
+
+    // Always update the messageOutput with the latest message
+    if (data.message) {
+        document.getElementById("messageOutput").innerHTML += `<br>${data.message}`;
     }
 };
-
 
 
 
@@ -152,7 +158,9 @@ function createBoard() {
 }
 let selectedMonster = null;
 
-
+let vampireIndex = 1;
+let werewolfIndex = 1;
+let ghostIndex = 1;
 function handleCellClick(row, col) {
     // Validate the move based on the player's side for placing a new monster
     const validPlacement =
@@ -166,7 +174,7 @@ function handleCellClick(row, col) {
         alert('It is not your turn.');
         return;
     }
-
+   
     const cell = document.querySelector(`.cell[data-row='${row}'][data-col='${col}']`);
     const cellContent = cell.textContent;
 
@@ -191,20 +199,28 @@ function handleCellClick(row, col) {
             // Place a new monster
             let monster = prompt("Enter the monster type (v, w, g):").toLowerCase();
             if (monster) {
-                if (monster === 'v') {
-                    monster = `${username[0]}.Vampire`;
-                } else if (monster === 'w') {
-                    monster = `${username[0]}.Werewolf`;
-                } else if (monster === 'g') {
-                    monster = `${username[0]}.Ghost`;
-                } else {
-                    alert('Invalid monster type. Please enter v, w, or g.');
-                    return;
+                let monsterName;
+                switch (monster) {
+                    case 'v':
+                        monsterName = `${username[0]}.Vampire.${vampireIndex}`;
+                        vampireIndex++; // Increment the index for next use
+                        break;
+                    case 'w':
+                        monsterName = `${username[0]}.Werewolf.${werewolfIndex}`;
+                        werewolfIndex++; // Increment the index for next use
+                        break;
+                    case 'g':
+                        monsterName = `${username[0]}.Ghost.${ghostIndex}`;
+                        ghostIndex++; // Increment the index for next use
+                        break;
+                    default:
+                        alert('Invalid monster type. Please enter v, w, or g.');
+                        return;
                 }
 
                 // Send the move to the server to place a new monster
-                const message = JSON.stringify({ type: 'makeMove', action: 'place', username, monster, row, col });
-                socket.send(message);
+                const message = JSON.stringify({ type: 'makeMove', action: 'place', username, monster: monsterName, row, col });
+        socket.send(message);
             }
         } else {
             alert('You can only place a monster on your designated side.');
