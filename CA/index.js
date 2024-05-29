@@ -110,7 +110,8 @@ wsServer.on('connection', async (ws) => { // connecting from the websocket
                 await client.close();
             }
             /////////////////////////////Joining a game message///////////////////////////  After logged        
-        } else if (msgObj.type === 'joinGame') {
+        } 
+        else if (msgObj.type === 'joinGame') {
             const { username } = msgObj;
 
             if (!players.some(player => player.username === username)) {
@@ -144,16 +145,21 @@ wsServer.on('connection', async (ws) => { // connecting from the websocket
                 let gameState = {
                     players: playerUsernames,
                     playerMonsters: playerMonsters,
-                    playerEliminations: playerEliminations,                 
+                    playerEliminations: playerEliminations,
                     currentPlayer: firstPlayer,
                     currentTurn: 1,
                     board: board,
+                   
                     playerSides: {
                         [playerUsernames[0]]: 'top',    // Player 1
                         [playerUsernames[1]]: 'bottom', // Player 2
                         [playerUsernames[2]]: 'left',   // Player 3
                         [playerUsernames[3]]: 'right'   // Player 4
-                    }
+                    },
+                    playerMonsterPositions: gamePlayers.reduce((acc, player) => {
+                        acc[player.username] = [];
+                        return acc;
+                    }, {})
                 };
         
                 // Sending game start message to all 4 players
@@ -223,47 +229,67 @@ async function handleTurn(gameState, gamePlayers) {
     while (true) {
         const currentPlayer = gamePlayers.find(player => player.username === gameState.currentPlayer);
 
-        // Wait for the current player to make a move
+        // Initialize or reset actions at the start of the turn
+        gameState.currentTurnActions = {
+            moves: 0,
+            placements: 0
+        };
+
+        // Wait for the current player to make a move or end the turn
         await new Promise(resolve => {
-            currentPlayer.ws.once('message', (message) => {
+            currentPlayer.ws.on('message', (message) => {
                 const msgObj = JSON.parse(message);
 
                 if (msgObj.type === 'makeMove') {
-                    const { monster, row, col } = msgObj;
+                    const { action, monster, row, col, fromRow, fromCol, toRow, toCol } = msgObj;
 
-                    // Place the monster on the board
-                    gameState.board[row][col] = monster;
-                    gameState.playerMonsters[gameState.currentPlayer]++;
+                    if (action === 'place' && gameState.currentTurnActions.placements < 1) {
+                        // Ensure the cell is empty before placing
+                        if (gameState.board[row][col] === null) {
+                            gameState.board[row][col] = monster;
+                            gameState.playerMonsters[gameState.currentPlayer]++;
+                            gameState.playerMonsterPositions[gameState.currentPlayer].push({ row, col, monster });
+                            gameState.currentTurnActions.placements++;
+                        }
+                    } else if (action === 'move' && gameState.currentTurnActions.moves < gameState.playerMonsterPositions[gameState.currentPlayer].length) {
+                        // Move the monster on the board
+                        if (gameState.board[toRow][toCol] === null) {
+                            gameState.board[fromRow][fromCol] = null;
+                            gameState.board[toRow][toCol] = monster;
+
+                            const monsterIndex = gameState.playerMonsterPositions[gameState.currentPlayer]
+                                .findIndex(m => m.row === fromRow && m.col === fromCol);
+                            if (monsterIndex > -1) {
+                                gameState.playerMonsterPositions[gameState.currentPlayer][monsterIndex] = { row: toRow, col: toCol, monster };
+                                gameState.currentTurnActions.moves++;
+                            }
+                        }
+                    }
 
                     // Broadcast the updated game state
-                    const promises = gamePlayers.map(player => player.ws.send(JSON.stringify({
+                    gamePlayers.forEach(player => player.ws.send(JSON.stringify({
                         ...gameState,
-                        message: `${gameState.currentPlayer} placed a ${monster} at ${String.fromCharCode(65 + col)}${row + 1}`
+                        message: `${gameState.currentPlayer} ${action === 'place' ? 'placed' : 'moved'} a ${monster} ${action === 'place' ? `at ${String.fromCharCode(65 + col)}${row + 1}` : `from ${String.fromCharCode(65 + fromCol)}${fromRow + 1} to ${String.fromCharCode(65 + toCol)}${toRow + 1}`}`
+                    })));
+                } else if (msgObj.type === 'endTurn') {
+                    // End the current turn
+                    gameState.currentTurn++;
+                    const nextPlayerIndex = (gameState.players.indexOf(gameState.currentPlayer) + 1) % gameState.players.length;
+                    gameState.currentPlayer = gameState.players[nextPlayerIndex];
+
+                    // Notify all players of the new current player
+                    gamePlayers.forEach(player => player.ws.send(JSON.stringify({
+                        currentPlayer: gameState.currentPlayer,
+                        message: `It is now ${gameState.currentPlayer}'s turn`
                     })));
 
-                    Promise.all(promises).then(() => {
-                        // End the current turn
-                        gameState.currentTurn++;
-                       
-                        const nextPlayerIndex = (gameState.players.indexOf(gameState.currentPlayer) + 1) % gameState.players.length;
-                        gameState.currentPlayer = gameState.players[nextPlayerIndex];
-
-                        // Notify all players of the new current player
-                        const nextTurnPromises = gamePlayers.map(player => player.ws.send(JSON.stringify({
-                            currentPlayer: gameState.currentPlayer,
-                            message: `It is now ${gameState.currentPlayer}'s turn`
-                        })));
-
-                        Promise.all(nextTurnPromises).then(() => {
-                          
-                            resolve(); // Proceed to the next turn
-                        });
-                    });
+                    resolve(); // Proceed to the next turn
                 }
             });
         });
     }
 }
+
 
 function createEmptyBoard() {
     const board = [];

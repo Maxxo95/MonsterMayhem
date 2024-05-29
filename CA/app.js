@@ -4,11 +4,12 @@ const socket = new WebSocket('ws://localhost:3000');
 Boolean:looged = false;
 let playerSide = null;
 let currentPlayer = null;
+
 // Send a message when the button is clicked to the Index.js (backend)
 const button = document.getElementById("message");
 /////////////////////// button log in 
 button.addEventListener("click", () => {
-    const username = document.querySelector('input[name="username"]').value;
+ const  username = document.querySelector('input[name="username"]').value;
     const pass = document.querySelector('input[name="pass"]').value;
     const loginMessage = {
         type: 'login',
@@ -149,47 +150,77 @@ function createBoard() {
     emptyBottomRight.classList.add('cell', 'header');
     board.appendChild(emptyBottomRight);
 }
+let selectedMonster = null;
+
 
 function handleCellClick(row, col) {
-    // Validate the move based on the player's side
-    const validMove = 
+    // Validate the move based on the player's side for placing a new monster
+    const validPlacement =
         (playerSide === 'top' && row === 0) ||
         (playerSide === 'bottom' && row === 9) ||
         (playerSide === 'left' && col === 0) ||
         (playerSide === 'right' && col === 9);
-
-    if (!validMove) {
-        alert('You can only place a monster on your designated side.');
-        return;
-    }
 
     // Check if it's the current player's turn
     if (currentPlayer !== username) {
         alert('It is not your turn.');
         return;
     }
+
     const cell = document.querySelector(`.cell[data-row='${row}'][data-col='${col}']`);
     const cellContent = cell.textContent;
-    
-  // Prompt for the monster type
-  let monster = prompt("Enter the monster type (v, w, g):").toLowerCase();
-  if (monster) {
-      if (monster === 'v') {
-          monster = 'Vampire';
-      } else if (monster === 'w') {
-          monster = 'Werewolf';
-      } else if (monster === 'g') {
-          monster = 'Ghost';
-      } else {
-          alert('Invalid monster type. Please enter v, w, or g.');
-          return;
-      }
-      
-      // Send the move to the server
-      const message = JSON.stringify({ type: 'makeMove', monster: monster, row: row, col: col });
-      socket.send(message);
-  }
+
+    if (selectedMonster) {
+        // If a monster is selected, attempt to move it to the clicked cell
+        const { row: fromRow, col: fromCol, monster } = selectedMonster;
+
+        if (isValidMove(fromRow, fromCol, row, col) && !cellContent) {
+            // Send the move to the server to move the selected monster
+            const message = JSON.stringify({ type: 'makeMove', action: 'move', monster, fromRow, fromCol, toRow: row, toCol: col });
+            socket.send(message);
+            selectedMonster = null; // Clear the selected monster after the move is sent
+        } else {
+            alert('Invalid move or destination cell is occupied. Please select a valid destination.');
+        }
+    } else {
+        // If no monster is selected, either place a new monster or select an existing one
+        if (cellContent && cellContent.startsWith(username[0])) {
+            // Select the existing monster for movement
+            selectedMonster = { row, col, monster: cellContent };
+        } else if (validPlacement && !cellContent) {
+            // Place a new monster
+            let monster = prompt("Enter the monster type (v, w, g):").toLowerCase();
+            if (monster) {
+                if (monster === 'v') {
+                    monster = `${username[0]}.Vampire`;
+                } else if (monster === 'w') {
+                    monster = `${username[0]}.Werewolf`;
+                } else if (monster === 'g') {
+                    monster = `${username[0]}.Ghost`;
+                } else {
+                    alert('Invalid monster type. Please enter v, w, or g.');
+                    return;
+                }
+
+                // Send the move to the server to place a new monster
+                const message = JSON.stringify({ type: 'makeMove', action: 'place', monster, row, col });
+                socket.send(message);
+            }
+        } else {
+            alert('You can only place a monster on your designated side.');
+        }
+    }
 }
+
+// Add a button for ending the turn
+const endTurnButton = document.createElement('button');
+endTurnButton.textContent = 'End Turn';
+endTurnButton.onclick = function() {
+    const message = JSON.stringify({ type: 'endTurn' });
+    socket.send(message);
+};
+document.body.appendChild(endTurnButton);
+
 function updateBoard(board) {
     for (let row = 0; row < board.length; row++) {
         for (let col = 0; col < board[row].length; col++) {
@@ -199,6 +230,10 @@ function updateBoard(board) {
     }
 }
 
+function isValidMove(fromRow, fromCol, toRow, toCol) {
+    // Add your logic to validate the move, e.g., check if the move is within allowed range
+    return true; // Placeholder, implement actual logic
+}
 
 //////////////////////////////////////////////////
 /////////////////////////////////////////////// CSS JS
