@@ -144,8 +144,7 @@ wsServer.on('connection', async (ws) => { // connecting from the websocket
                 let gameState = {
                     players: playerUsernames,
                     playerMonsters: playerMonsters,
-                    playerEliminations: playerEliminations,
-                    sides: sides,
+                    playerEliminations: playerEliminations,                 
                     currentPlayer: firstPlayer,
                     currentTurn: 1,
                     board: board,
@@ -170,18 +169,26 @@ wsServer.on('connection', async (ws) => { // connecting from the websocket
              
             } else {
                 const waitingPlayers = players.map(player => player.username);
+                let side = ""; // Initialize the side variable
+            
+                if (waitingPlayers.length === 1) {
+                    side = "Top";
+                } else if (waitingPlayers.length === 2) {
+                    side = "Bottom";
+                } else if (waitingPlayers.length === 3) {
+                    side = "Left";
+                }else{side ="Right"};
+                
                 ws.send(JSON.stringify({
                     players: waitingPlayers,
-                    sides: 'Side of the board',
-                    message: 'Waiting for more players to join...'
-                }));
+                    message: 'Waiting for more players to join... Your side is: ' + side // Include the determined side in the message
+               }));
                
             }
 
         }
     });
-
-    ws.on('close', () => {
+ ws.on('close', () => {
         players = players.filter(player => player.ws !== ws);
     });
 });
@@ -237,6 +244,7 @@ async function handleTurn(gameState, gamePlayers) {
                     Promise.all(promises).then(() => {
                         // End the current turn
                         gameState.currentTurn++;
+                       
                         const nextPlayerIndex = (gameState.players.indexOf(gameState.currentPlayer) + 1) % gameState.players.length;
                         gameState.currentPlayer = gameState.players[nextPlayerIndex];
 
@@ -247,6 +255,7 @@ async function handleTurn(gameState, gamePlayers) {
                         })));
 
                         Promise.all(nextTurnPromises).then(() => {
+                          
                             resolve(); // Proceed to the next turn
                         });
                     });

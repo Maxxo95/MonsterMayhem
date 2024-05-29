@@ -53,6 +53,7 @@ socket.onopen = () => {
         document.getElementById("usernameOutput").textContent = `Username: ${data.username}`;
         document.getElementById("gamesPlayedOutput").textContent = `Games Played: ${data.gamesPlayed}`;
         document.getElementById("gamesWonOutput").textContent = `Games Won: ${data.gamesWon}`;
+       
         login();
         createBoard();
     } else if (data.error) {
@@ -60,12 +61,13 @@ socket.onopen = () => {
         console.error('Error from server', data.error);
     }  if (data.players) {
         document.getElementById("messageOutput").innerHTML = `
-            Players: ${data.players.join(', ')} <br>
+        User : ${username}  <br> 
+        Side : ${playerSide}   <br>
+        Players: ${data.players.join(', ')} <br>
             Monsters: ${JSON.stringify(data.playerMonsters)} <br>
             Eliminations: ${JSON.stringify(data.playerEliminations)} <br>
-            Sides: ${data.sides} <br>
-            First Player: ${data.currentPlayer} <br>
-            ${data.message || 'Game is starting!'}
+            Current  player : ${data.currentPlayer} <br>
+            ${data.message || 'Game is starting!'} 
         `;
         updateBoard(data.board);
         playerSide = data.playerSides[username];
@@ -78,8 +80,9 @@ socket.onopen = () => {
         console.log("Current Player:", currentPlayer);
     } else if (data.currentPlayer) {
         currentPlayer = data.currentPlayer;
-        document.getElementById("messageOutput").innerHTML += `<br>${data.message}`;
         console.log("Current Player Updated:", currentPlayer);
+        document.getElementById("messageOutput").innerHTML += `<br>${data.message}`;
+        
     }
 };
 
@@ -165,15 +168,28 @@ function handleCellClick(row, col) {
         alert('It is not your turn.');
         return;
     }
-
-    // Send the move to the server
-    const monster = prompt("Enter the monster type (vampire, werewolf, ghost):");
-    if (monster) {
-        const message = JSON.stringify({ type: 'makeMove', monster: monster, row: row, col: col });
-        socket.send(message);
-    }
+    const cell = document.querySelector(`.cell[data-row='${row}'][data-col='${col}']`);
+    const cellContent = cell.textContent;
+    
+  // Prompt for the monster type
+  let monster = prompt("Enter the monster type (v, w, g):").toLowerCase();
+  if (monster) {
+      if (monster === 'v') {
+          monster = 'Vampire';
+      } else if (monster === 'w') {
+          monster = 'Werewolf';
+      } else if (monster === 'g') {
+          monster = 'Ghost';
+      } else {
+          alert('Invalid monster type. Please enter v, w, or g.');
+          return;
+      }
+      
+      // Send the move to the server
+      const message = JSON.stringify({ type: 'makeMove', monster: monster, row: row, col: col });
+      socket.send(message);
+  }
 }
-
 function updateBoard(board) {
     for (let row = 0; row < board.length; row++) {
         for (let col = 0; col < board[row].length; col++) {
