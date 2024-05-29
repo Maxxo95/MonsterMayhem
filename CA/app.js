@@ -58,33 +58,34 @@ socket.onopen = () => {
         login();
         createBoard();
     } else if (data.error) {
+        
         document.getElementById("messageOutput").textContent = "Invalid Credentials";
         console.error('Error from server', data.error);
     }  if (data.players) {
-        document.getElementById("messageOutput").innerHTML = `
-        User : ${username}  <br> 
-        Side : ${playerSide}   <br>
-        Players: ${data.players.join(', ')} <br>
-            Monsters: ${JSON.stringify(data.playerMonsters)} <br>
-            Eliminations: ${JSON.stringify(data.playerEliminations)} <br>
-            Current  player : ${data.currentPlayer} <br>
-            ${data.message || 'Game is starting!'} 
-        `;
-        updateBoard(data.board);
         playerSide = data.playerSides[username];
         currentPlayer = data.currentPlayer;
-        console.log("Player Side:", playerSide);
-        console.log("Current Player:", currentPlayer);
-    } else if (data.board) {
-        updateBoard(data.board);
-        currentPlayer = data.currentPlayer;
-        console.log("Current Player:", currentPlayer);
-    } else if (data.currentPlayer) {
-        currentPlayer = data.currentPlayer;
-        console.log("Current Player Updated:", currentPlayer);
-        document.getElementById("messageOutput").innerHTML += `<br>${data.message}`;
-        
-    }
+
+        document.getElementById("messageOutput").innerHTML = `
+        User: ${username}<br> 
+        Side: ${playerSide}<br>
+        Players: ${data.players.join(', ')}<br>
+        Monsters: ${JSON.stringify(data.playerMonsters)}<br>
+        Eliminations: ${JSON.stringify(data.playerEliminations)}<br>
+        Current player: ${data.currentPlayer}<br>
+        ${data.message || 'Game is starting!'}
+    `;
+    updateBoard(data.board);
+    console.log("Player Side:", playerSide);
+    console.log("Current Player:", currentPlayer);
+} else if (data.board) {
+    updateBoard(data.board);
+    currentPlayer = data.currentPlayer;
+    console.log("Board Updated. Current Player:", currentPlayer);
+} else if (data.currentPlayer) {
+    currentPlayer = data.currentPlayer;
+    console.log("Current Player Updated:", currentPlayer);
+    document.getElementById("messageOutput").innerHTML += `<br>${data.message}`;
+}
 };
 
 
