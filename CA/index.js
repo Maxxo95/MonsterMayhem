@@ -276,17 +276,24 @@ async function handleTurn(gameState, gamePlayers) {
                                 gameState.currentTurnActions.moves++;
                                 console.log(`Move successful. Current moves: ${gameState.currentTurnActions.moves}`); // Debug log
                             }
-                        } else  if (destinationMonster && !destinationMonster.startsWith(currentPlayer.username[0])) {
-                            
+                        } else if (destinationMonster && !destinationMonster.startsWith(currentPlayer.username[0])) {
                             console.log(`Initiating battle: ${monster} vs ${destinationMonster} at (${toRow}, ${toCol})`); // Debug log
-                            handleBattle(gameState, currentPlayer, gamePlayers, { 
-                                row: toRow, 
-                                col: toCol, 
-                                opponentMonster: destinationMonster, 
-                                playerMonster: monster, 
-                                fromRow: fromRow, 
-                                fromCol: fromCol 
-                            }); } else {
+                            
+                            const playerMonsters = gameState.playerMonsters[currentPlayer.username];
+                            const playerEliminations = gameState.playerEliminations[currentPlayer.username];
+                            
+                            handleBattle(gameState, currentPlayer, gamePlayers, {
+                                row: toRow,
+                                col: toCol,
+                                opponentMonster: destinationMonster,
+                                playerMonster: monster,
+                                fromRow: fromRow,
+                                fromCol: fromCol,
+                                playerMonsters: playerMonsters,
+                                playerEliminations: playerEliminations
+                            });
+                        }
+                         else {
                             console.log(`Failed to move ${monster} to (${toRow}, ${toCol}): Cell is occupied by own monster`); // Debug log
                             currentPlayer.ws.send(JSON.stringify({
                                 message: `Invalid move: Destination cell ${String.fromCharCode(65 + toCol)}${toRow + 1} is already occupied by your own monster.`
@@ -328,7 +335,9 @@ async function handleBattle(gameState, currentPlayer, gamePlayers, {
     opponentMonster: destinationMonster, 
     playerMonster, 
     fromRow, 
-    fromCol 
+    fromCol,
+    playerMonsters,
+    playerEliminations
 }) {
 
     if (!playerMonster || !destinationMonster) {
@@ -338,6 +347,8 @@ async function handleBattle(gameState, currentPlayer, gamePlayers, {
     // Extract playerType and opponentType using lastIndexOf method
     const playerType = playerMonster.split('.')[1];
     const opponentType = destinationMonster.split('.')[1];
+    const oponent = destinationMonster.split('.')[0];
+    const username = playerMonster.split('.')[0];
     // Log the extracted monster types for debugging
     console.log(`Player Type: ${playerType}, Opponent Type: ${opponentType}`);
 
@@ -351,17 +362,25 @@ async function handleBattle(gameState, currentPlayer, gamePlayers, {
         console.log(`${destinationMonster} defeated by ${playerMonster}`);
         gameState.board[toRow][toCol] = playerMonster;
         gameState.board[fromRow][fromCol] = null;
+        gameState.playerEliminations[oponent]++;
+        gameState.playerMonsters[oponent]--;
     } else if ((opponentType === 'Vampire' && playerType === 'Werewolf') || 
                (opponentType === 'Werewolf' && playerType === 'Ghost') || 
                (opponentType === 'Ghost' && playerType === 'Vampire')) {
         // Player's monster is removed
         console.log(`${playerMonster} defeated by ${destinationMonster}`);
         gameState.board[fromRow][fromCol] = null;
+        gameState.playerEliminations[username]++;
+        gameState.playerMonsters[username]--;
     } else if (playerType === opponentType) {
         // Both monsters are removed
         console.log(`${playerMonster} and ${destinationMonster} destroy each other`);
         gameState.board[toRow][toCol] = null;
         gameState.board[fromRow][fromCol] = null;
+        gameState.playerEliminations[username]++;
+        gameState.playerMonsters[username]--;
+        gameState.playerEliminations[oponent]++;
+        gameState.playerMonsters[oponent]--;
     } else {
         console.log('Battle inconclusive');
     }
@@ -370,6 +389,7 @@ async function handleBattle(gameState, currentPlayer, gamePlayers, {
         ...gameState,
         message: `Battle occurred at ${String.fromCharCode(65 + toCol)}${toRow + 1}`
     })));
+
 }
 
 
