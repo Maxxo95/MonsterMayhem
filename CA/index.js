@@ -111,7 +111,7 @@ wsServer.on('connection', async (ws) => { // connecting from the websocket
                 await client.close();
             }
             /////////////////////////////Joining a game message///////////////////////////  After logged        
-        } 
+        }
         else if (msgObj.type === 'joinGame') {
             const { username } = msgObj;
 
@@ -140,62 +140,79 @@ wsServer.on('connection', async (ws) => { // connecting from the websocket
                     acc[player.username] = 0;
                     return acc;
                 }, {});
+                const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
+                try {
+                    await client.connect();
+                    const db = client.db('MonsterMayhemUsers');
+                    const users = db.collection('users');
 
-                // Sending game start message to all 4 players
-                const firstPlayer =  determineFirstPlayer(playerMonsters, gamePlayers);
-                let gameState = {
-                    players: playerUsernames,
-                    playerMonsters: playerMonsters,
-                    playerEliminations: playerEliminations,
-                    currentPlayer: firstPlayer,
-                    currentTurn: 1,
-                    board: board,
-                   
-                    playerSides: {
-                        [playerUsernames[0]]: 'top',    // Player 1
-                        [playerUsernames[1]]: 'bottom', // Player 2
-                        [playerUsernames[2]]: 'left',   // Player 3
-                        [playerUsernames[3]]: 'right'   // Player 4
-                    },
-                    playerMonsterPositions: gamePlayers.reduce((acc, player) => {
-                        acc[player.username] = [];
-                        return acc;
-                    }, {})
-                };
-        
-                // Sending game start message to all 4 players
-                const promises = gamePlayers.map(player => player.ws.send(JSON.stringify({
-                    ...gameState,
-                    message: 'Game is starting!'
-                })));
-    
-                await Promise.all(promises);
-    
+                    // Increment gamesPlayed for all players
+                    await Promise.all(playerUsernames.map(username =>
+                        users.updateOne(
+                            { username: username },
+                            { $inc: { gamesPlayed: 1 } }
+                        )
+                    ));
+                    // Sending game start message to all 4 players
+                    const firstPlayer = determineFirstPlayer(playerMonsters, gamePlayers);
+                    let gameState = {
+                        players: playerUsernames,
+                        playerMonsters: playerMonsters,
+                        playerEliminations: playerEliminations,
+                        currentPlayer: firstPlayer,
+                        currentTurn: 1,
+                        board: board,
+                        winner: "",
+                        playerSides: {
+                            [playerUsernames[0]]: 'top',    // Player 1
+                            [playerUsernames[1]]: 'bottom', // Player 2
+                            [playerUsernames[2]]: 'left',   // Player 3
+                            [playerUsernames[3]]: 'right'   // Player 4
+                        },
+                        playerMonsterPositions: gamePlayers.reduce((acc, player) => {
+                            acc[player.username] = [];
+                            return acc;
+                        }, {})
+                    };
 
-                handleTurn(gameState, gamePlayers);
-             
+                    // Sending game start message to all 4 players
+                    const promises = gamePlayers.map(player => player.ws.send(JSON.stringify({
+                        ...gameState,
+                        message: 'Game is starting!'
+                    })));
+
+                    await Promise.all(promises);
+
+
+
+                    handleTurn(gameState, gamePlayers);
+                } catch (error) {
+                    console.error('Error connecting to MongoDB:', error);
+                } finally {
+                    await client.close();
+                }
             } else {
                 const waitingPlayers = players.map(player => player.username);
                 let side = ""; // Initialize the side variable
-            
+
                 if (waitingPlayers.length === 1) {
                     side = "Top";
                 } else if (waitingPlayers.length === 2) {
                     side = "Bottom";
                 } else if (waitingPlayers.length === 3) {
                     side = "Left";
-                }else{side ="Right"};
-                
+                } else { side = "Right" };
+
                 ws.send(JSON.stringify({
                     players: waitingPlayers,
                     message: 'Waiting for more players to join... Your side is: ' + side // Include the determined side in the message
-               }));
-               
+                }));
+
             }
 
         }
     });
- ws.on('close', () => {
+    ws.on('close', () => {
         players = players.filter(player => player.ws !== ws);
     });
 });
@@ -227,9 +244,10 @@ function determineFirstPlayer(playerMonsters, gamePlayers) {
     return firstPlayer; // Return firstPlayer value for access outside the function
 }
 async function handleTurn(gameState, gamePlayers) {
-    while (true) {
+    let winner = "";
+    while (winner === "") {
         const currentPlayer = gamePlayers.find(player => player.username === gameState.currentPlayer);
-        
+
         // Initialize or reset actions at the start of the turn
         gameState.currentTurnActions = {
             moves: 0,
@@ -237,7 +255,7 @@ async function handleTurn(gameState, gamePlayers) {
         };
 
         await new Promise(resolve => {
-            const messageHandler = (message) => {
+            const messageHandler = async (message) => {
                 const msgObj = JSON.parse(message);
 
                 if (msgObj.username !== gameState.currentPlayer) {
@@ -278,10 +296,10 @@ async function handleTurn(gameState, gamePlayers) {
                             }
                         } else if (destinationMonster && !destinationMonster.startsWith(currentPlayer.username[0])) {
                             console.log(`Initiating battle: ${monster} vs ${destinationMonster} at (${toRow}, ${toCol})`); // Debug log
-                            
+
                             const playerMonsters = gameState.playerMonsters[currentPlayer.username];
                             const playerEliminations = gameState.playerEliminations[currentPlayer.username];
-                            
+
                             handleBattle(gameState, currentPlayer, gamePlayers, {
                                 row: toRow,
                                 col: toCol,
@@ -292,8 +310,51 @@ async function handleTurn(gameState, gamePlayers) {
                                 playerMonsters: playerMonsters,
                                 playerEliminations: playerEliminations
                             });
+
+                            const eliminatedPlayers = Object.entries(gameState.playerEliminations).filter(([username, count]) => count >= 1);
+                            eliminatedPlayers.forEach(([username]) => {
+                                console.log(`${username} has been eliminated from the game.`);
+                                gameState.players = gameState.players.filter(player => player !== username);
+                                gamePlayers = gamePlayers.filter(player => player.username !== username);
+
+                                // Notify all players about the elimination
+                                gamePlayers.forEach(player => player.ws.send(JSON.stringify({
+                                    ...gameState,
+                                    message: `${username} has been eliminated from the game.`
+                                })));
+                            });
+
+                            if (gameState.players.length === 1) {
+                                winner = gameState.players[0];
+                                console.log(`${winner} has won the game!`);
+                                const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true }); // modify to newst version
+
+                                try {
+                                    await client.connect();
+                                    const db = client.db('MonsterMayhemUsers');
+                                    const users = db.collection('users');
+
+                                    await users.updateOne(
+                                        { username: winner },
+                                        { $inc: { gamesWon: 1 } }
+                                    )
+                                }
+                                catch (error) {
+                                    console.error('Error connecting to MongoDB:', error);
+                                } finally {
+                                    await client.close();
+                                }
+                                // Notify all players about the winner
+                                gamePlayers.forEach(player => player.ws.send(JSON.stringify({
+                                    ...gameState,
+                                    message: `${winner} has won the game!`
+                                })));
+
+                                return winner; // End the game
+                            }
                         }
-                         else {
+
+                        else {
                             console.log(`Failed to move ${monster} to (${toRow}, ${toCol}): Cell is occupied by own monster`); // Debug log
                             currentPlayer.ws.send(JSON.stringify({
                                 message: `Invalid move: Destination cell ${String.fromCharCode(65 + toCol)}${toRow + 1} is already occupied by your own monster.`
@@ -329,12 +390,12 @@ async function handleTurn(gameState, gamePlayers) {
     }
 }
 
-async function handleBattle(gameState, currentPlayer, gamePlayers, { 
-    row: toRow, 
-    col: toCol, 
-    opponentMonster: destinationMonster, 
-    playerMonster, 
-    fromRow, 
+async function handleBattle(gameState, currentPlayer, gamePlayers, {
+    row: toRow,
+    col: toCol,
+    opponentMonster: destinationMonster,
+    playerMonster,
+    fromRow,
     fromCol,
     playerMonsters,
     playerEliminations
@@ -353,10 +414,10 @@ async function handleBattle(gameState, currentPlayer, gamePlayers, {
     console.log(`Player Type: ${playerType}, Opponent Type: ${opponentType}`);
 
     // Perform battle based on the extracted monster types
-   
+
     // Perform battle based on the extracted monster types
-    if ((playerType === 'Vampire' && opponentType === 'Werewolf') || 
-        (playerType === 'Werewolf' && opponentType === 'Ghost') || 
+    if ((playerType === 'Vampire' && opponentType === 'Werewolf') ||
+        (playerType === 'Werewolf' && opponentType === 'Ghost') ||
         (playerType === 'Ghost' && opponentType === 'Vampire')) {
         // Opponent's monster is removed
         console.log(`${destinationMonster} defeated by ${playerMonster}`);
@@ -364,9 +425,9 @@ async function handleBattle(gameState, currentPlayer, gamePlayers, {
         gameState.board[fromRow][fromCol] = null;
         gameState.playerEliminations[oponent]++;
         gameState.playerMonsters[oponent]--;
-    } else if ((opponentType === 'Vampire' && playerType === 'Werewolf') || 
-               (opponentType === 'Werewolf' && playerType === 'Ghost') || 
-               (opponentType === 'Ghost' && playerType === 'Vampire')) {
+    } else if ((opponentType === 'Vampire' && playerType === 'Werewolf') ||
+        (opponentType === 'Werewolf' && playerType === 'Ghost') ||
+        (opponentType === 'Ghost' && playerType === 'Vampire')) {
         // Player's monster is removed
         console.log(`${playerMonster} defeated by ${destinationMonster}`);
         gameState.board[fromRow][fromCol] = null;
