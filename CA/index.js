@@ -27,7 +27,7 @@ const board = [];
 ////////////////////////////////////////////////// Routes
 app.get('/', (req, res) => {
     console.log('Welcome Visitor');
-    viewCount += 1;
+    
     res.render('index', { viewCount });
 });
 
@@ -328,7 +328,7 @@ async function handleTurn(gameState, gamePlayers) {
                                 winner = gameState.players[0];
                                 console.log(`${winner} has won the game!`);
                                 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true }); // modify to newst version
-
+                                viewCount += 1;
                                 try {
                                     await client.connect();
                                     const db = client.db('MonsterMayhemUsers');

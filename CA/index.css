@@ -52,6 +52,10 @@ button {
     margin-bottom: 10px;
 }
 
+#endTurnButton {
+    width: 20%; /* Set the width to 20% of the available space */
+    /* You can add more styles as needed */
+}
 #message {
     background-color: #056637;
     color: white;

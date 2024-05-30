@@ -237,13 +237,16 @@ function handleCellClick(row, col) {
 
 
 // Add a button for ending the turn
-const endTurnButton = document.createElement('button');
+const endTurnButton = document.getElementById("endTurnButton");
+
+
+
 endTurnButton.textContent = 'End Turn';
 endTurnButton.onclick = function() {
     const message = JSON.stringify({ type: 'endTurn', username });
     socket.send(message);
 };
-document.body.appendChild(endTurnButton);
+
 
 // Function to update the board
 function updateBoard(board) {
