@@ -183,7 +183,7 @@ function handleCellClick(row, col) {
         // If a monster is selected, attempt to move it to the clicked cell
         const { row: fromRow, col: fromCol, monster } = selectedMonster;
 
-        if (isValidMove(fromRow, fromCol, row, col) && !cellContent) {
+        if (isValidMove(fromRow, fromCol, row, col)) {
             // Send the move to the server to move the selected monster
             const message = JSON.stringify({ type: 'makeMove', action: 'move', username, monster, fromRow, fromCol, toRow: row, toCol: col });
             socket.send(message);
@@ -197,6 +197,11 @@ function handleCellClick(row, col) {
             // Select the existing monster for movement
             selectedMonster = { row, col, monster: cellContent };
             alert(`${cellContent} Selected`);
+        } else if (cellContent && !cellContent.startsWith(username[0])) {
+            // Attempt to battle with an opponent's monster
+            const { row: opponentRow, col: opponentCol, monster: opponentMonster } = { row, col, monster: cellContent };
+            const message = JSON.stringify({ type: 'makeMove', action: 'battle', username, opponentMonster, row: opponentRow, col: opponentCol });
+            socket.send(message);
         } else if (validPlacement && !cellContent) {
             // Place a new monster
             let monster = prompt("Enter the monster type (v, w, g):").toLowerCase();
@@ -229,6 +234,7 @@ function handleCellClick(row, col) {
         }
     }
 }
+
 
 // Add a button for ending the turn
 const endTurnButton = document.createElement('button');

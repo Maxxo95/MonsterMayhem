@@ -23,6 +23,7 @@ let gameState = {};
 let viewCount = 0;
 let players = [];
 const sides = ['North', 'South', 'East', 'West'];
+const board = [];
 ////////////////////////////////////////////////// Routes
 app.get('/', (req, res) => {
     console.log('Welcome Visitor');
@@ -224,7 +225,8 @@ function determineFirstPlayer(playerMonsters, gamePlayers) {
     }
 
     return firstPlayer; // Return firstPlayer value for access outside the function
-}async function handleTurn(gameState, gamePlayers) {
+}
+async function handleTurn(gameState, gamePlayers) {
     while (true) {
         const currentPlayer = gamePlayers.find(player => player.username === gameState.currentPlayer);
         
@@ -261,7 +263,8 @@ function determineFirstPlayer(playerMonsters, gamePlayers) {
                             }));
                         }
                     } else if (action === 'move' && gameState.currentTurnActions.moves < gameState.playerMonsterPositions[gameState.currentPlayer].length) {
-                        if (gameState.board[toRow][toCol] === null) {
+                        const destinationMonster = gameState.board[toRow][toCol];
+                        if (destinationMonster === null) {
                             console.log(`Moving ${monster} from (${fromRow}, ${fromCol}) to (${toRow}, ${toCol})`); // Debug log
                             gameState.board[fromRow][fromCol] = null;
                             gameState.board[toRow][toCol] = monster;
@@ -273,10 +276,20 @@ function determineFirstPlayer(playerMonsters, gamePlayers) {
                                 gameState.currentTurnActions.moves++;
                                 console.log(`Move successful. Current moves: ${gameState.currentTurnActions.moves}`); // Debug log
                             }
-                        } else {
-                            console.log(`Failed to move ${monster} to (${toRow}, ${toCol}): Cell is occupied`); // Debug log
+                        } else  if (destinationMonster && !destinationMonster.startsWith(currentPlayer.username[0])) {
+                            
+                            console.log(`Initiating battle: ${monster} vs ${destinationMonster} at (${toRow}, ${toCol})`); // Debug log
+                            handleBattle(gameState, currentPlayer, gamePlayers, { 
+                                row: toRow, 
+                                col: toCol, 
+                                opponentMonster: destinationMonster, 
+                                playerMonster: monster, 
+                                fromRow: fromRow, 
+                                fromCol: fromCol 
+                            }); } else {
+                            console.log(`Failed to move ${monster} to (${toRow}, ${toCol}): Cell is occupied by own monster`); // Debug log
                             currentPlayer.ws.send(JSON.stringify({
-                                message: `Invalid move: Destination cell ${String.fromCharCode(65 + toCol)}${toRow + 1} is already occupied.`
+                                message: `Invalid move: Destination cell ${String.fromCharCode(65 + toCol)}${toRow + 1} is already occupied by your own monster.`
                             }));
                         }
                     }
@@ -308,6 +321,57 @@ function determineFirstPlayer(playerMonsters, gamePlayers) {
         });
     }
 }
+
+async function handleBattle(gameState, currentPlayer, gamePlayers, { 
+    row: toRow, 
+    col: toCol, 
+    opponentMonster: destinationMonster, 
+    playerMonster, 
+    fromRow, 
+    fromCol 
+}) {
+
+    if (!playerMonster || !destinationMonster) {
+        console.log('Error: Missing monsters for battle');
+        return;
+    }
+    // Extract playerType and opponentType using lastIndexOf method
+    const playerType = playerMonster.split('.')[1];
+    const opponentType = destinationMonster.split('.')[1];
+    // Log the extracted monster types for debugging
+    console.log(`Player Type: ${playerType}, Opponent Type: ${opponentType}`);
+
+    // Perform battle based on the extracted monster types
+   
+    // Perform battle based on the extracted monster types
+    if ((playerType === 'Vampire' && opponentType === 'Werewolf') || 
+        (playerType === 'Werewolf' && opponentType === 'Ghost') || 
+        (playerType === 'Ghost' && opponentType === 'Vampire')) {
+        // Opponent's monster is removed
+        console.log(`${destinationMonster} defeated by ${playerMonster}`);
+        gameState.board[toRow][toCol] = playerMonster;
+        gameState.board[fromRow][fromCol] = null;
+    } else if ((opponentType === 'Vampire' && playerType === 'Werewolf') || 
+               (opponentType === 'Werewolf' && playerType === 'Ghost') || 
+               (opponentType === 'Ghost' && playerType === 'Vampire')) {
+        // Player's monster is removed
+        console.log(`${playerMonster} defeated by ${destinationMonster}`);
+        gameState.board[fromRow][fromCol] = null;
+    } else if (playerType === opponentType) {
+        // Both monsters are removed
+        console.log(`${playerMonster} and ${destinationMonster} destroy each other`);
+        gameState.board[toRow][toCol] = null;
+        gameState.board[fromRow][fromCol] = null;
+    } else {
+        console.log('Battle inconclusive');
+    }
+    // Notify players about the battle outcome
+    gamePlayers.forEach(player => player.ws.send(JSON.stringify({
+        ...gameState,
+        message: `Battle occurred at ${String.fromCharCode(65 + toCol)}${toRow + 1}`
+    })));
+}
+
 
 
 
