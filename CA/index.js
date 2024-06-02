@@ -4,7 +4,7 @@ const ejs = require('ejs');
 const path = require('path');
 const { WebSocketServer } = require('ws');
 const http = require('http');
-//const socketIO = require('socket.io');
+
 
 // Web build
 const PORT = process.argv[2] || 3000;
@@ -14,16 +14,16 @@ const httpServer = http.createServer(app);
 app.use(bodyParser.urlencoded({ extended: true }));
 app.set('view engine', 'ejs');
 app.use(express.static(path.join(__dirname, '.')));// location of app.js root 
+
 /////////////////// Mongo 
 const { MongoClient } = require('mongodb');
 const uri = 'mongodb://localhost:27017';
+const handleGame = require('./JSpartials/handleGame');// Import the handleGame function from handleGame.js
 
-const handleGame = require('./JSpartials/handleGame');
 /// Variables
 let gameState = {};
 let viewCount = 0;
 let players = [];
-
 const board = [];
 ////////////////////////////////////////////////// Routes
 app.get('/', (req, res) => {
@@ -117,24 +117,20 @@ wsServer.on('connection', async (ws) => { // connecting from the websocket
             /////////////////////////////Joining a game message///////////////////////////  After logged        
         }
         else if (msgObj.type === 'joinGame') {
-            const { username } = msgObj;
+            const { username } = msgObj;                // Get the username from the message
 
-            if (!players.some(player => player.username === username)) {
-                players.push({ username, ws });
+            if (!players.some(player => player.username === username)) { // Check if the player is already in the game
+                players.push({ username, ws }); // Add the player 
             }
           
-
-            if (players.length >= 4) {
+            if (players.length >= 4) { 
                 const gamePlayers = players.slice(0, 4);
                 players = players.slice(4);
 
+           /// Variables for the game and the players 
                 const playerUsernames = gamePlayers.map(player => player.username);
-
-
-
-                let board = createEmptyBoard();
-
-                let playerMonsters = gamePlayers.reduce((acc, player) => {
+                let board = createEmptyBoard();           
+                let playerMonsters = gamePlayers.reduce((acc, player) => {  
                     acc[player.username] = 0;
                     return acc;
                 }, {});
@@ -142,14 +138,14 @@ wsServer.on('connection', async (ws) => { // connecting from the websocket
                     acc[player.username] = 0;
                     return acc;
                 }, {});
-                const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
-                try {
+                const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true }); // Add one gamed played to all players
+                try {                                                                          
                     await client.connect();
                     const db = client.db('MonsterMayhemUsers');
                     const users = db.collection('users');
 
                     // Increment gamesPlayed for all players
-                    await Promise.all(playerUsernames.map(username =>
+                    await Promise.all(playerUsernames.map(username =>        
                         users.updateOne(
                             { username: username },
                             { $inc: { gamesPlayed: 1 } }
@@ -162,7 +158,7 @@ wsServer.on('connection', async (ws) => { // connecting from the websocket
                 }    
                     // Sending game start message to all 4 players
                     const firstPlayer = determineFirstPlayer(playerMonsters, gamePlayers);
-                    let gameState = {
+                    let gameState = {                             // Game state , this will keep alll the info of the game played on the back end 
                         players: playerUsernames,
                         playerMonsters: playerMonsters,
                         playerEliminations: playerEliminations,
@@ -176,7 +172,7 @@ wsServer.on('connection', async (ws) => { // connecting from the websocket
                             [playerUsernames[2]]: 'left',   // Player 3
                             [playerUsernames[3]]: 'right'   // Player 4
                         },
-                        playerMonsterPositions: gamePlayers.reduce((acc, player) => {
+                        playerMonsterPositions: gamePlayers.reduce((acc, player) => { // Not at the moment but when the game start , monster position have to be stored 
                             acc[player.username] = [];
                             return acc;
                         }, {})
@@ -190,9 +186,9 @@ wsServer.on('connection', async (ws) => { // connecting from the websocket
 
                     await Promise.all(promises);
 
-                    handleGame(gameState, gamePlayers,viewCount);
+                    handleGame(gameState, gamePlayers,viewCount);     // With all the variables and the game state the handleGame function deploy the game 
               
-            } else {
+            } else {     // If there are not enough players to start the game 
                 const waitingPlayers = players.map(player => player.username);
                 let side = ""; // Initialize the side variable
 

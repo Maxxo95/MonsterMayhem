@@ -1,7 +1,7 @@
 // Establish the WebSocket connection
 
 const socket = new WebSocket('ws://localhost:3000');
-Boolean:looged = false;
+Boolean: looged = false;
 let playerSide = null;
 let currentPlayer = null;
 
@@ -9,7 +9,7 @@ let currentPlayer = null;
 const button = document.getElementById("message");
 /////////////////////// button log in 
 button.addEventListener("click", () => {
- const  username = document.querySelector('input[name="username"]').value;
+    const username = document.querySelector('input[name="username"]').value;
     const pass = document.querySelector('input[name="pass"]').value;
     const loginMessage = {
         type: 'login',
@@ -21,7 +21,6 @@ button.addEventListener("click", () => {
 
 // Handle registration button  to /reg
 const registrationButton = document.getElementById("registration");
-
 registrationButton.addEventListener("click", () => {
     window.location.href = '/reg';
 });
@@ -31,7 +30,7 @@ const joinGameButton = document.getElementById("joingame");
 joinGameButton.addEventListener("click", () => {
     if (username) {
         const joinGameMessage = {
-            type: 'joinGame',  
+            type: 'joinGame',
             username: username
         };
         socket.send(JSON.stringify(joinGameMessage)); // send info of the user wanting to join a game 
@@ -39,30 +38,66 @@ joinGameButton.addEventListener("click", () => {
         document.getElementById("messageOutput").textContent = "You need to log in first."; // if you click and are not logged in wont let u play 
     }
 });
-////////////////// socket connection 
-socket.onopen = () => { 
+
+
+// Add a button for ending the turn
+const endTurnButton = document.getElementById("endTurnButton");
+
+endTurnButton.textContent = 'End Turn';
+endTurnButton.onclick = function () {
+    const message = JSON.stringify({ type: 'endTurn', username });
+    socket.send(message);
+};
+
+
+// Function to update the board
+function updateBoard(board) {
+    for (let row = 0; row < board.length; row++) {
+        for (let col = 0; col < board[row].length; col++) {
+            const cell = document.querySelector(`.cell[data-row='${row}'][data-col='${col}']`);
+            cell.textContent = board[row][col] ? board[row][col] : '';
+        }
+    }
+}
+
+// Function to validate the move
+function isValidMove(fromRow, fromCol, toRow, toCol) {
+    const rowDiff = Math.abs(fromRow - toRow);
+    const colDiff = Math.abs(fromCol - toCol);
+
+    // Check if the move is to any cell in the same row or same column
+    const isSameRowOrColumnMove = (fromRow === toRow || fromCol === toCol);
+
+    // Check if the move is to a cell one or two cells diagonally
+    const isDiagonalMove = rowDiff === colDiff && (rowDiff === 1 || rowDiff === 2);
+
+    return isSameRowOrColumnMove || isDiagonalMove;
+}
+////////////////// socket connection  handle connection with the back end 
+////// 
+socket.onopen = () => {
     console.log('WebSocket connection opened');
     socket.send(JSON.stringify({ type: 'joinGame', username: username }));
-   
-};socket.onmessage = (event) => {
+
+}; socket.onmessage = (event) => {
     const data = JSON.parse(event.data);
 
     console.log('Received data from server:', data);
-
+///   When user is logged is correct  print this data 
     if (data.username) {
         username = data.username;
         document.getElementById("usernameOutput").textContent = `Username: ${data.username}`;
-        document.getElementById("gamesPlayedOutput").textContent = `Games Played: ${data.gamesPlayed}`;
+        document.getElementById("gamesPlayedOutput").textContent = `Games Lost: ${data.gamesPlayed-data.gamesWon}`;      
         document.getElementById("gamesWonOutput").textContent = `Games Won: ${data.gamesWon}`;
-       
-        login();
-        createBoard();
-    } else if (data.error) {
+
+        login();  // update CCS visibility for user to show Data of the user or game 
+        createBoard(); // Create the game board 
+    } else if (data.error) {   // IF credentials not valid 
         document.getElementById("messageOutput").textContent = "Invalid Credentials";
         console.error('Error from server', data.error);
-    }  else   if (data.players) {
+    } else if (data.players) { //  Here on the game handle data of the game
         // Display initial game information
-        document.getElementById("messageOutput").innerHTML = `
+        document.getElementById("messageOutput").innerHTML = `   // Display the game information of the general game every time is updated
             User: ${username} <br>
             Side: ${playerSide} <br>
             Players: ${data.players.join(', ')} <br>
@@ -71,17 +106,17 @@ socket.onopen = () => {
             Current player: ${data.currentPlayer} <br>
             ${data.message || 'Game is starting!'}
         `;
-        updateBoard(data.board);
+        updateBoard(data.board);  // Update the board with the moves done trough the game
         playerSide = data.playerSides[username];
         currentPlayer = data.currentPlayer;
         console.log("Player Side:", playerSide);
         console.log("Current Player:", currentPlayer);
-    } else if (data.board) {
+    } else if (data.board) {    // connected up when board changes
         // Update board state and current player
         updateBoard(data.board);
         currentPlayer = data.currentPlayer;
         console.log("Current Player:", currentPlayer);
-    } else if (data.currentPlayer) {
+    } else if (data.currentPlayer) {   // Update only the current player when turn changes 
         // Update only the current player and display the message
         currentPlayer = data.currentPlayer;
         console.log("Current Player Updated:", currentPlayer);
@@ -89,7 +124,7 @@ socket.onopen = () => {
     }
 
     // Always update the messageOutput with the latest message
-    if (data.message) {
+    if (data.message) { 
         document.getElementById("messageOutput").innerHTML += `<br>${data.message}`;
     }
 };
@@ -97,8 +132,8 @@ socket.onopen = () => {
 
 
 /////////////////////////////////
-///////////////////////////////////Board (May simplify if trouble when building game)
-////////////////////////////////////
+///////////////////////////////////Board    I try to change to new file before summiting but it would not  work so
+////////////////////////////////
 function createBoard() {
     const board = document.getElementById('gameBoard');
     board.style.gridTemplateColumns = '50px repeat(10, 50px) 30px';
@@ -235,42 +270,6 @@ function handleCellClick(row, col) {
     }
 }
 
-
-// Add a button for ending the turn
-const endTurnButton = document.getElementById("endTurnButton");
-
-
-
-endTurnButton.textContent = 'End Turn';
-endTurnButton.onclick = function() {
-    const message = JSON.stringify({ type: 'endTurn', username });
-    socket.send(message);
-};
-
-
-// Function to update the board
-function updateBoard(board) {
-    for (let row = 0; row < board.length; row++) {
-        for (let col = 0; col < board[row].length; col++) {
-            const cell = document.querySelector(`.cell[data-row='${row}'][data-col='${col}']`);
-            cell.textContent = board[row][col] ? board[row][col] : '';
-        }
-    }
-}
-
-// Function to validate the move
-function isValidMove(fromRow, fromCol, toRow, toCol) {
-    const rowDiff = Math.abs(fromRow - toRow);
-    const colDiff = Math.abs(fromCol - toCol);
-
-    // Check if the move is to any cell in the same row or same column
-    const isSameRowOrColumnMove = (fromRow === toRow || fromCol === toCol);
-
-    // Check if the move is to a cell one or two cells diagonally
-    const isDiagonalMove = rowDiff === colDiff && (rowDiff === 1 || rowDiff === 2);
-
-    return isSameRowOrColumnMove || isDiagonalMove;
-}
 //////////////////////////////////////////////////
 /////////////////////////////////////////////// CSS JS
 //////////////////////////////////////////////// 
@@ -313,6 +312,6 @@ function updateUI() {
         joinGameButton.style.display = 'none'; // Hide the play button
         loginDiv.classList.remove('login-small');
         loginDiv.classList.add('login-large');
-        
+
     }
 }

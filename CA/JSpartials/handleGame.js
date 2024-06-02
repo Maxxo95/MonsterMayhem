@@ -1,19 +1,18 @@
 
-const handleBattles = require('./handleBattles');
-const { MongoClient } = require('mongodb');
-const uri = 'mongodb://localhost:27017';
-async function handleGame(gameState, gamePlayers,viewCount) {
+const handleBattles = require('./handleBattles');  // Import the handleBattles function 
+const { MongoClient } = require('mongodb'); // Import the MongoClient class from the mongodb module
+const uri = 'mongodb://localhost:27017'; // Connection URI
+async function handleGame(gameState, gamePlayers, viewCount) { //Async funtion for handling the game on separete thread
     let winner = "";
-    while (winner === "") {
-        const currentPlayer = gamePlayers.find(player => player.username === gameState.currentPlayer);
-
+    while (winner === "") { // Continue the game until a winner is determined
+        const currentPlayer = gamePlayers.find(player => player.username === gameState.currentPlayer); // 
         // Initialize or reset actions at the start of the turn
         gameState.currentTurnActions = {
             moves: 0,
             placements: 0
         };
 
-        await new Promise(resolve => {
+        await new Promise(resolve => { // Turn loop of players
             const messageHandler = async (message) => {
                 const msgObj = JSON.parse(message);
 
@@ -21,11 +20,11 @@ async function handleGame(gameState, gamePlayers,viewCount) {
                     return;
                 }
 
-                if (msgObj.type === 'makeMove') {
+                if (msgObj.type === 'makeMove') { // Handle player moves
                     const { action, monster, row, col, fromRow, fromCol, toRow, toCol } = msgObj;
                     console.log(`Received move: ${JSON.stringify(msgObj)}`); // Debug log
 
-                    if (action === 'place' && gameState.currentTurnActions.placements < 1) {
+                    if (action === 'place' && gameState.currentTurnActions.placements < 1) { // Players can place 1 mosnter per turn
                         if (gameState.board[row][col] === null) {
                             console.log(`Placing ${monster} at (${row}, ${col})`); // Debug log
                             gameState.board[row][col] = monster;
@@ -33,12 +32,13 @@ async function handleGame(gameState, gamePlayers,viewCount) {
                             gameState.playerMonsterPositions[gameState.currentPlayer].push({ row, col, monster });
                             gameState.currentTurnActions.placements++;
                             console.log(`Placement successful. Current placements: ${gameState.currentTurnActions.placements}`); // Debug log
-                        } else {
+                        } else {  //Else if the cell is already occupied
                             console.log(`Failed to place ${monster} at (${row}, ${col}): Cell is occupied`); // Debug log
                             currentPlayer.ws.send(JSON.stringify({
                                 message: `Invalid placement: Cell ${String.fromCharCode(65 + col)}${row + 1} is already occupied.`
                             }));
                         }
+                        //Moving player monsters 
                     } else if (action === 'move' && gameState.currentTurnActions.moves < gameState.playerMonsterPositions[gameState.currentPlayer].length) {
                         const destinationMonster = gameState.board[toRow][toCol];
                         if (destinationMonster === null) {
@@ -53,6 +53,7 @@ async function handleGame(gameState, gamePlayers,viewCount) {
                                 gameState.currentTurnActions.moves++;
                                 console.log(`Move successful. Current moves: ${gameState.currentTurnActions.moves}`); // Debug log
                             }
+                            /// IF monsters are of different players, then initiate battle      
                         } else if (destinationMonster && !destinationMonster.startsWith(currentPlayer.username[0])) {
                             console.log(`Initiating battle: ${monster} vs ${destinationMonster} at (${toRow}, ${toCol})`); // Debug log
 
@@ -69,7 +70,7 @@ async function handleGame(gameState, gamePlayers,viewCount) {
                                 playerMonsters: playerMonsters,
                                 playerEliminations: playerEliminations
                             });
-
+                            // For each player, check if they have been eliminated from the game
                             const eliminatedPlayers = Object.entries(gameState.playerEliminations).filter(([username, count]) => count >= 1);
                             eliminatedPlayers.forEach(([username]) => {
                                 console.log(`${username} has been eliminated from the game.`);
@@ -82,13 +83,13 @@ async function handleGame(gameState, gamePlayers,viewCount) {
                                     message: `${username} has been eliminated from the game.`
                                 })));
                             });
-
+                            ///////// If only one player is left, then declare the winner
                             if (gameState.players.length === 1) {
                                 winner = gameState.players[0];
                                 console.log(`${winner} has won the game!`);
                                 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true }); // modify to newst version
                                 viewCount += 1;
-                                try {
+                                try { // Write victory on the database
                                     await client.connect();
                                     const db = client.db('MonsterMayhemUsers');
                                     const users = db.collection('users');
@@ -151,4 +152,4 @@ async function handleGame(gameState, gamePlayers,viewCount) {
 
 
 
-module.exports = handleGame;
+module.exports = handleGame; // Export the handleGame function
